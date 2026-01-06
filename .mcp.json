@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mcp-toolkit-stdio": {
+      "command": "node",
+      "args": ["${MCP_TOOLKIT_PATH:-./packages/mcp/dist}/index.js", "--dev"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    "mcp-toolkit-http": {
+      "type": "http",
+      "url": "http://localhost:${MCP_TOOLKIT_PORT:-3000}/mcp"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@mcp-toolkit/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcp-toolkit-cli": "./bin/run.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "cli": "node bin/run.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@mcp-toolkit/model": "workspace:*",
+    "@mcp-toolkit/provider": "workspace:*",
+    "@oclif/core": "^4.2.10",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@mcp-toolkit/typescript-config": "workspace:*",
+    "@mcp-toolkit/vitest-config": "workspace:*",
+    "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "^2.1.8",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "oclif": {
+    "bin": "mcp-toolkit-cli",
+    "dirname": "mcp-toolkit",
+    "commands": "./dist/commands",
+    "topicSeparator": " "
+  }
+}

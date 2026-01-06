@@ -1,0 +1,201 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Check for changesets
+        id: check-changesets
+        run: |
+          CHANGESET_COUNT=$(find .changeset -name '*.md' ! -name 'README.md' | wc -l)
+          echo "count=$CHANGESET_COUNT" >> $GITHUB_OUTPUT
+          if [ "$CHANGESET_COUNT" -eq 0 ]; then
+            echo "No changesets found"
+          else
+            echo "Found $CHANGESET_COUNT changeset(s) - will create version PR"
+          fi
+
+      - name: Check if this is a version commit
+        id: check-version-commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          if [[ "$COMMIT_MSG" == "chore: version packages" ]]; then
+            echo "is_version_commit=true" >> $GITHUB_OUTPUT
+            echo "This is a version commit - will create release"
+          else
+            echo "is_version_commit=false" >> $GITHUB_OUTPUT
+            echo "Not a version commit - skipping release"
+          fi
+
+      - name: Create Release Pull Request
+        if: steps.check-changesets.outputs.count != '0'
+        uses: changesets/action@v1
+        with:
+          version: pnpm release:version
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version for release
+        if: steps.check-version-commit.outputs.is_version_commit == 'true'
+        id: get-version
+        run: |
+          VERSION=$(node -p "require('./packages/mcp/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Check if release already exists
+        if: steps.check-version-commit.outputs.is_version_commit == 'true'
+        id: check-release
+        run: |
+          VERSION="v${{ steps.get-version.outputs.version }}"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release $VERSION already exists, skipping"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release $VERSION does not exist, will create"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release archive
+        if: steps.check-version-commit.outputs.is_version_commit == 'true' && steps.check-release.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          ARCHIVE_NAME="mcp-toolkit-${VERSION}"
+
+          # Create a clean directory for the archive (no .git)
+          mkdir -p /tmp/release
+          rsync -av --progress . /tmp/release/${ARCHIVE_NAME}/ \
+            --exclude .git \
+            --exclude node_modules \
+            --exclude .turbo \
+            --exclude '*.tsbuildinfo' \
+            --exclude coverage \
+            --exclude .pnpm-store
+
+          # Create zip archive
+          cd /tmp/release
+          zip -r ${ARCHIVE_NAME}.zip ${ARCHIVE_NAME}
+
+          # Move archive to workspace
+          mv ${ARCHIVE_NAME}.zip $GITHUB_WORKSPACE/
+
+          echo "Created archive: ${ARCHIVE_NAME}.zip"
+          ls -lh $GITHUB_WORKSPACE/${ARCHIVE_NAME}.zip
+
+      - name: Generate release notes
+        if: steps.check-version-commit.outputs.is_version_commit == 'true' && steps.check-release.outputs.exists == 'false'
+        id: release-notes
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+
+          # Get the changelog entry for this version from any package that has one
+          NOTES=""
+          for pkg in packages/mcp packages/cli packages/model packages/provider; do
+            if [ -f "$pkg/CHANGELOG.md" ]; then
+              # Extract the section for this version
+              SECTION=$(awk "/^## ${VERSION}$/,/^## [0-9]/" "$pkg/CHANGELOG.md" | head -n -1)
+              if [ -n "$SECTION" ]; then
+                PKG_NAME=$(basename $pkg)
+                NOTES="${NOTES}\n### @mcp-toolkit/${PKG_NAME}\n${SECTION}\n"
+              fi
+            fi
+          done
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release v${VERSION}"
+          fi
+
+          # Write to file for the release
+          echo -e "$NOTES" > /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        if: steps.check-version-commit.outputs.is_version_commit == 'true' && steps.check-release.outputs.exists == 'false'
+        run: |
+          VERSION="v${{ steps.get-version.outputs.version }}"
+          ARCHIVE_NAME="mcp-toolkit-${{ steps.get-version.outputs.version }}.zip"
+
+          gh release create "$VERSION" \
+            --title "Release $VERSION" \
+            --notes-file /tmp/release-notes.md \
+            "$ARCHIVE_NAME"
+
+          echo "### Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "Archive: $ARCHIVE_NAME" >> $GITHUB_STEP_SUMMARY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary (release already exists)
+        if: steps.check-version-commit.outputs.is_version_commit == 'true' && steps.check-release.outputs.exists == 'true'
+        run: |
+          echo "### Release Already Exists" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Release v${{ steps.get-version.outputs.version }} already exists, skipping." >> $GITHUB_STEP_SUMMARY
+
+      - name: Summary (no action needed)
+        if: steps.check-changesets.outputs.count == '0' && steps.check-version-commit.outputs.is_version_commit == 'false'
+        run: |
+          echo "### No Action Needed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No changesets found and not a version commit. Nothing to do." >> $GITHUB_STEP_SUMMARY

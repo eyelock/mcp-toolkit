@@ -1,0 +1,19 @@
+{
+  "notes": {
+    "pushBehavior": "remind",
+    "configureGitRefspecs": false
+  },
+  "lastModified": "2026-01-06T13:06:25.464Z",
+  "explicitlySet": [
+    "notes.pushBehavior",
+    "provider.default",
+    "session.healthCheckOnStart",
+    "notes.configureGitRefspecs"
+  ],
+  "provider": {
+    "default": "git-notes"
+  },
+  "session": {
+    "healthCheckOnStart": true
+  }
+}

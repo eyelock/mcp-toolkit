@@ -90,15 +90,44 @@ if [ -f "packages/cli/package.json" ]; then
     sed -i '' "s/mcp-toolkit-cli/${PROJECT_NAME}-cli/g" packages/cli/bin/run.js 2>/dev/null || true
 fi
 
-# Initialize fresh git repo
-echo -e "${BLUE}Initializing git repository...${NC}"
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from mcp-toolkit template
+# Handle git repository
+echo -e "${BLUE}Setting up git repository...${NC}"
+
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    # We're inside a git repository - preserve it
+    COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo "0")
+
+    if [ "$COMMIT_COUNT" -gt 0 ]; then
+        echo -e "${YELLOW}Existing git repository detected with ${COMMIT_COUNT} commit(s).${NC}"
+        echo -e "${YELLOW}Preserving existing git history.${NC}"
+        echo ""
+        read -p "Create a new commit for the template customization? [Y/n] " CREATE_COMMIT
+        CREATE_COMMIT=${CREATE_COMMIT:-Y}
+
+        if [[ "$CREATE_COMMIT" =~ ^[Yy]$ ]]; then
+            git add .
+            git commit -m "chore: customize from mcp-toolkit template
+
+Project: ${PROJECT_NAME}
+Scope: ${PACKAGE_SCOPE}" || echo -e "${YELLOW}No changes to commit${NC}"
+        fi
+    else
+        # Git repo exists but no commits yet
+        git add .
+        git commit -m "Initial commit from mcp-toolkit template
 
 Project: ${PROJECT_NAME}
 Scope: ${PACKAGE_SCOPE}"
+    fi
+else
+    # No git repository - initialize fresh
+    git init
+    git add .
+    git commit -m "Initial commit from mcp-toolkit template
+
+Project: ${PROJECT_NAME}
+Scope: ${PACKAGE_SCOPE}"
+fi
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"

@@ -28,20 +28,20 @@ clean:
 
 # MCP Server
 mcp:
-	pnpm workspace @mcp-toolkit/mcp build
-	npx @modelcontextprotocol/inspector pnpm workspace @mcp-toolkit/mcp start:stdio
+	pnpm --filter @mcp-toolkit/mcp build
+	pnpm mcp-inspector pnpm --filter @mcp-toolkit/mcp start:stdio
 
 mcp.stdio:
-	pnpm workspace @mcp-toolkit/mcp build
-	pnpm workspace @mcp-toolkit/mcp start:stdio
+	pnpm --filter @mcp-toolkit/mcp build
+	pnpm --filter @mcp-toolkit/mcp start:stdio
 
 mcp.http:
-	pnpm workspace @mcp-toolkit/mcp build
-	pnpm workspace @mcp-toolkit/mcp start:http
+	pnpm --filter @mcp-toolkit/mcp build
+	pnpm --filter @mcp-toolkit/mcp start:http
 
 # CLI
 cli:
-	pnpm workspace @mcp-toolkit/cli run cli --help
+	pnpm --filter @mcp-toolkit/cli run cli --help
 
 # Worktree Management
 worktree:

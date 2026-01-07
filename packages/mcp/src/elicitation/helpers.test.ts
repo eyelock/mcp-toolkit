@@ -3,6 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { Mock } from "vitest";
 import {
   getElicitationTimeout,
   DEFAULT_ELICITATION_TIMEOUT_MS,
@@ -13,6 +15,14 @@ import {
   elicitChoice,
   ElicitationNotSupportedError,
 } from "./helpers.js";
+
+/**
+ * Mock server type for testing elicitation functionality
+ */
+interface MockServer extends Partial<Server> {
+  _clientCapabilities?: { elicitation?: { form?: boolean } };
+  elicitInput: Mock;
+}
 
 describe("Elicitation Helpers", () => {
   describe("getElicitationTimeout", () => {
@@ -54,34 +64,34 @@ describe("Elicitation Helpers", () => {
 
   describe("clientSupportsElicitation", () => {
     it("should return false when no capabilities", () => {
-      const server = {} as any;
+      const server = {} as unknown as Server;
       expect(clientSupportsElicitation(server)).toBe(false);
     });
 
     it("should return false when elicitation not in capabilities", () => {
       const server = {
         _clientCapabilities: {},
-      } as any;
+      } as unknown as Server;
       expect(clientSupportsElicitation(server)).toBe(false);
     });
 
     it("should return false when form not in elicitation", () => {
       const server = {
         _clientCapabilities: { elicitation: {} },
-      } as any;
+      } as unknown as Server;
       expect(clientSupportsElicitation(server)).toBe(false);
     });
 
     it("should return true when form elicitation supported", () => {
       const server = {
         _clientCapabilities: { elicitation: { form: true } },
-      } as any;
+      } as unknown as Server;
       expect(clientSupportsElicitation(server)).toBe(true);
     });
   });
 
   describe("elicitInput", () => {
-    let mockServer: any;
+    let mockServer: MockServer;
     let consoleSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
@@ -97,7 +107,7 @@ describe("Elicitation Helpers", () => {
     });
 
     it("should throw when client does not support elicitation", async () => {
-      const unsupportedServer = {} as any;
+      const unsupportedServer = {} as unknown as Server;
 
       await expect(
         elicitInput(unsupportedServer, "Test", { type: "object", properties: {} })
@@ -171,7 +181,7 @@ describe("Elicitation Helpers", () => {
   });
 
   describe("elicitConfirmation", () => {
-    let mockServer: any;
+    let mockServer: MockServer;
     let consoleSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
@@ -232,7 +242,7 @@ describe("Elicitation Helpers", () => {
   });
 
   describe("elicitText", () => {
-    let mockServer: any;
+    let mockServer: MockServer;
     let consoleSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
@@ -302,7 +312,7 @@ describe("Elicitation Helpers", () => {
   });
 
   describe("elicitChoice", () => {
-    let mockServer: any;
+    let mockServer: MockServer;
     let consoleSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {

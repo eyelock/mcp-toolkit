@@ -186,6 +186,7 @@ export async function elicitInput<T>(
       requestedSchema: schema,
     };
 
+    // biome-ignore lint/suspicious/noExplicitAny: SDK types are stricter than our schema type
     const result: ElicitResult = await server.elicitInput(params as any, { timeout });
 
     if (logEvent) {

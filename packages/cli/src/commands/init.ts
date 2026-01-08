@@ -74,10 +74,12 @@ export default class Init extends Command {
     const validatedFeatures = SessionFeaturesSchema.parse(features);
 
     // Use provider (in real implementation, this would persist)
+    // CLI doesn't use sampling, so disable client discovery
     const provider = createMemoryProvider();
     const result = await provider.initSession({
       projectName: args.projectName,
       features: validatedFeatures,
+      discoverClient: false,
     });
 
     if (!result.success) {

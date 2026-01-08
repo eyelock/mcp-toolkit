@@ -215,7 +215,8 @@ export function createCodeReviewRequest(
 ): CreateMessageRequest["params"] {
   const focusInstructions = {
     security: "Focus on security vulnerabilities, input validation, and potential exploits.",
-    performance: "Focus on performance bottlenecks, unnecessary operations, and optimization opportunities.",
+    performance:
+      "Focus on performance bottlenecks, unnecessary operations, and optimization opportunities.",
     readability: "Focus on code clarity, naming conventions, and maintainability.",
     all: "Review for security, performance, and readability issues.",
   };

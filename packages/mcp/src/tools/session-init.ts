@@ -5,10 +5,12 @@
  * - Zod schema integration
  * - Provider usage
  * - Input validation
+ * - Composite execution strategy (client discovery via delegation)
  */
 
 import {
   type SessionConfig,
+  type ClientMetadata,
   SessionFeaturesSchema,
   SessionInitInputSchema,
 } from "@mcp-toolkit/model";
@@ -16,19 +18,36 @@ import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ServerContext } from "../server.js";
+import { executeWithDelegation, resolveToolStrategy } from "../strategy/index.js";
+import { discoverClientMetadata } from "../strategy/client-discovery.js";
+import { logDebug, logInfo } from "../logging.js";
+
+/** Tool name for client discovery sub-task */
+const CLIENT_DISCOVERY_TOOL = "session_init:client_discovery";
 
 /**
  * Tool definition for session-init
+ *
+ * Demonstrates the composite execution strategy pattern:
+ * - Accepts clientMetadata directly if provided
+ * - Uses sampling to discover client identity if not provided (delegate-first)
+ * - Falls back gracefully if sampling is unavailable
  */
 export const sessionInitTool: Tool = {
   name: "session_init",
   description:
-    "Initialize a new session with project configuration. Sets up the project name and enables MCP features (tools, resources, prompts, sampling).",
+    "Initialize a new session with project configuration. Sets up the project name, enables MCP features, " +
+    "and optionally discovers client metadata via sampling.",
   inputSchema: zodToJsonSchema(SessionInitInputSchema) as Tool["inputSchema"],
 };
 
 /**
  * Handle session-init tool call
+ *
+ * Demonstrates the composite execution strategy pattern:
+ * 1. If clientMetadata provided -> use directly (no need to delegate)
+ * 2. If discoverClient=true -> use delegate-first strategy for discovery
+ * 3. Proceed with or without metadata (non-blocking)
  */
 export async function handleSessionInit(
   args: unknown,
@@ -49,6 +68,7 @@ export async function handleSessionInit(
   }
 
   const input = parseResult.data;
+  const { projectName, features, clientMetadata, discoverClient = true } = input;
 
   // Check if session already exists
   const hasSession = await context.provider.hasSession();
@@ -65,8 +85,87 @@ export async function handleSessionInit(
     };
   }
 
-  // Initialize session
-  const result = await context.provider.initSession(input);
+  // ==========================================================================
+  // Composite Strategy: Client Metadata Resolution
+  //
+  // This demonstrates the "delegate-first" pattern:
+  // - Only the LLM knows what model it is
+  // - If metadata not provided and discovery enabled, ask the LLM via sampling
+  // - Fall back gracefully if sampling unavailable
+  // ==========================================================================
+  let resolvedMetadata: ClientMetadata | undefined = clientMetadata;
+  let metadataSource: "provided" | "discovered" | "unavailable" = "unavailable";
+
+  if (clientMetadata) {
+    // Case 1: Client metadata was provided directly - no delegation needed
+    metadataSource = "provided";
+    logDebug("Using provided client metadata", {
+      metadata: { clientName: clientMetadata.clientName, model: clientMetadata.model },
+    });
+  } else if (discoverClient) {
+    // Case 2: Attempt to discover via sampling using configured strategy
+    // This is a perfect use case - only the LLM knows its own model identifier
+    //
+    // Strategy is resolved from context.defaultToolStrategies configuration.
+    // Default is "local-only" (self-reliant), but can be configured to:
+    // - "delegate-first": Try sampling, fallback to local
+    // - "delegate-only": Must delegate, error if unavailable
+    const strategyEntry = resolveToolStrategy(CLIENT_DISCOVERY_TOOL, context.defaultToolStrategies);
+
+    logDebug("Attempting client discovery", {
+      metadata: {
+        strategy: strategyEntry.strategy,
+        fallbackEnabled: strategyEntry.fallbackEnabled,
+      },
+    });
+
+    const delegationResult = await executeWithDelegation(
+      context.server,
+      { timeout: strategyEntry.delegationTimeout ?? 30_000 },
+      // Delegation function - ask the LLM about itself
+      async (server, delegateArgs) => {
+        return discoverClientMetadata(server, delegateArgs.timeout);
+      },
+      // Local function - we don't know locally, return null
+      async () => null,
+      {
+        strategy: strategyEntry.strategy,
+        toolName: CLIENT_DISCOVERY_TOOL,
+        delegationTimeout: strategyEntry.delegationTimeout,
+        fallbackEnabled: strategyEntry.fallbackEnabled,
+      }
+    );
+
+    if (delegationResult.outcome === "delegated" && delegationResult.result) {
+      resolvedMetadata = delegationResult.result as ClientMetadata;
+      metadataSource = "discovered";
+      logInfo("Client metadata discovered via sampling", {
+        metadata: {
+          clientName: resolvedMetadata.clientName,
+          model: resolvedMetadata.model,
+          outcome: delegationResult.outcome,
+        },
+      });
+    } else {
+      logDebug("Client discovery not available or failed", {
+        metadata: {
+          outcome: delegationResult.outcome,
+          delegationAttempted: delegationResult.delegationAttempted,
+        },
+      });
+    }
+  }
+
+  // Initialize session with resolved data
+  // Note: discoverClient is only used by the tool, not stored in session
+  const sessionInput = {
+    projectName,
+    features,
+    clientMetadata: resolvedMetadata,
+    discoverClient: false, // Not relevant for storage, already processed above
+  };
+
+  const result = await context.provider.initSession(sessionInput);
 
   if (!result.success) {
     return {
@@ -90,6 +189,17 @@ export async function handleSessionInit(
   const tagsDisplay =
     tagEntries.length > 0 ? tagEntries.map(([k, v]) => `${k}=${v}`).join(", ") : "(none)";
 
+  // Build client info display
+  let clientInfoDisplay = "(not available)";
+  if (resolvedMetadata) {
+    const parts: string[] = [];
+    if (resolvedMetadata.clientName) parts.push(resolvedMetadata.clientName);
+    if (resolvedMetadata.model) parts.push(`model: ${resolvedMetadata.model}`);
+    if (parts.length > 0) {
+      clientInfoDisplay = `${parts.join(", ")} [${metadataSource}]`;
+    }
+  }
+
   return {
     content: [
       {
@@ -101,6 +211,7 @@ export async function handleSessionInit(
           `Tags: ${tagsDisplay}`,
           `Project: ${session.projectName}`,
           `Features: ${enabledFeatures.join(", ") || "none"}`,
+          `Client: ${clientInfoDisplay}`,
           `Created: ${session.createdAt}`,
         ].join("\n"),
       },
@@ -229,6 +340,17 @@ export async function handleSessionStatus(
   const tagsDisplay =
     tagEntries.length > 0 ? tagEntries.map(([k, v]) => `${k}=${v}`).join(", ") : "(none)";
 
+  // Build client info display
+  let clientInfoDisplay = "(not available)";
+  if (session.clientMetadata) {
+    const parts: string[] = [];
+    if (session.clientMetadata.clientName) parts.push(session.clientMetadata.clientName);
+    if (session.clientMetadata.model) parts.push(`model: ${session.clientMetadata.model}`);
+    if (parts.length > 0) {
+      clientInfoDisplay = parts.join(", ");
+    }
+  }
+
   return {
     content: [
       {
@@ -240,6 +362,7 @@ export async function handleSessionStatus(
           `Tags: ${tagsDisplay}`,
           `Project: ${session.projectName}`,
           `Features: ${enabledFeatures.join(", ") || "none"}`,
+          `Client: ${clientInfoDisplay}`,
           `Created: ${session.createdAt}`,
           `Updated: ${session.updatedAt}`,
         ].join("\n"),

@@ -6,3 +6,4 @@
  */
 
 export * from "./schema.js";
+export * from "./strategy.js";

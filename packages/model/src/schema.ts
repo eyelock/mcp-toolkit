@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { ClientMetadataSchema, ToolStrategyConfigSchema } from "./strategy.js";
 
 // =============================================================================
 // Server Identity
@@ -72,6 +73,10 @@ export const SessionConfigSchema = z
       .regex(/^[a-z0-9-]+$/, "Must be kebab-case")
       .describe("Project name in kebab-case format"),
     features: SessionFeaturesSchema.describe("Enabled MCP features"),
+    clientMetadata: ClientMetadataSchema.optional().describe(
+      "Discovered or provided client/LLM metadata"
+    ),
+    toolStrategies: ToolStrategyConfigSchema.describe("Per-tool execution strategy overrides"),
     createdAt: z.string().datetime().describe("ISO 8601 timestamp of session creation"),
     updatedAt: z.string().datetime().describe("ISO 8601 timestamp of last update"),
   })
@@ -87,6 +92,14 @@ export const SessionInitInputSchema = SessionConfigSchema.pick({
   features: SessionFeaturesSchema.partial()
     .optional()
     .describe("Features to enable (defaults will be applied for unspecified)"),
+  clientMetadata: ClientMetadataSchema.optional().describe(
+    "Optional client metadata. If not provided and sampling is available, will be discovered."
+  ),
+  discoverClient: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Whether to attempt client discovery via sampling if metadata not provided"),
 });
 
 /**

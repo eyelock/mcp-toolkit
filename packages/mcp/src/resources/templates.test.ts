@@ -78,10 +78,7 @@ describe("Resource Templates", () => {
     });
 
     it("handles templates with multiple parameters", () => {
-      const params = extractTemplateParams(
-        "log:///{date}/{level}",
-        "log:///2024-01-15/error"
-      );
+      const params = extractTemplateParams("log:///{date}/{level}", "log:///2024-01-15/error");
 
       expect(params).toEqual({ date: "2024-01-15", level: "error" });
     });
@@ -243,10 +240,7 @@ describe("Resource Templates", () => {
     it("returns null for unmatched URIs", async () => {
       const mockContext = {} as ServerContext;
 
-      const result = await handleTemplatedResourceRead(
-        "unknown:///something",
-        mockContext
-      );
+      const result = await handleTemplatedResourceRead("unknown:///something", mockContext);
 
       expect(result).toBeNull();
     });

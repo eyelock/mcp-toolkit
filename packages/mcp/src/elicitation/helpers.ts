@@ -201,11 +201,9 @@ export async function elicitInput<T>(
     };
   } catch (error) {
     if (logEvent) {
-      logError(
-        `Elicitation failed: ${String(error)}`,
-        error instanceof Error ? error : undefined,
-        { metadata: { feature: "elicitation" } }
-      );
+      logError(`Elicitation failed: ${String(error)}`, error instanceof Error ? error : undefined, {
+        metadata: { feature: "elicitation" },
+      });
     }
     throw error;
   }

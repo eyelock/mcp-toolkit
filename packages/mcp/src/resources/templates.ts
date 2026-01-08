@@ -49,7 +49,10 @@ export const FEATURE_CONFIG_TEMPLATE: ResourceTemplate = {
 /**
  * All available resource templates
  */
-export const resourceTemplates: ResourceTemplate[] = [LOG_ENTRIES_TEMPLATE, FEATURE_CONFIG_TEMPLATE];
+export const resourceTemplates: ResourceTemplate[] = [
+  LOG_ENTRIES_TEMPLATE,
+  FEATURE_CONFIG_TEMPLATE,
+];
 
 /**
  * Register all resource templates

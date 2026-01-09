@@ -18,7 +18,7 @@ import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ServerContext } from "../server.js";
-import { executeWithDelegation, resolveToolStrategy } from "../strategy/index.js";
+import { executeWithDelegation, resolveToolDelegation } from "../strategy/index.js";
 import { discoverClientMetadata } from "../strategy/client-discovery.js";
 import { logDebug, logInfo } from "../logging.js";
 
@@ -103,25 +103,25 @@ export async function handleSessionInit(
       metadata: { clientName: clientMetadata.clientName, model: clientMetadata.model },
     });
   } else if (discoverClient) {
-    // Case 2: Attempt to discover via sampling using configured strategy
+    // Case 2: Attempt to discover via sampling using configured delegation
     // This is a perfect use case - only the LLM knows its own model identifier
     //
-    // Strategy is resolved from context.defaultToolStrategies configuration.
+    // Delegation is resolved from context.defaultToolDelegations configuration.
     // Default is "local-only" (self-reliant), but can be configured to:
     // - "delegate-first": Try sampling, fallback to local
     // - "delegate-only": Must delegate, error if unavailable
-    const strategyEntry = resolveToolStrategy(CLIENT_DISCOVERY_TOOL, context.defaultToolStrategies);
+    const delegation = resolveToolDelegation(CLIENT_DISCOVERY_TOOL, context.defaultToolDelegations);
 
     logDebug("Attempting client discovery", {
       metadata: {
-        strategy: strategyEntry.strategy,
-        fallbackEnabled: strategyEntry.fallbackEnabled,
+        mode: delegation.mode,
+        fallbackEnabled: delegation.fallbackEnabled,
       },
     });
 
     const delegationResult = await executeWithDelegation(
       context.server,
-      { timeout: strategyEntry.delegationTimeout ?? 30_000 },
+      { timeout: delegation.delegationTimeout ?? 30_000 },
       // Delegation function - ask the LLM about itself
       async (server, delegateArgs) => {
         return discoverClientMetadata(server, delegateArgs.timeout);
@@ -129,10 +129,10 @@ export async function handleSessionInit(
       // Local function - we don't know locally, return null
       async () => null,
       {
-        strategy: strategyEntry.strategy,
+        mode: delegation.mode,
         toolName: CLIENT_DISCOVERY_TOOL,
-        delegationTimeout: strategyEntry.delegationTimeout,
-        fallbackEnabled: strategyEntry.fallbackEnabled,
+        delegationTimeout: delegation.delegationTimeout,
+        fallbackEnabled: delegation.fallbackEnabled,
       }
     );
 

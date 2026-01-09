@@ -1,7 +1,7 @@
 /**
- * @mcp-toolkit/model - Composite Tool Execution Strategy Schemas
+ * @mcp-toolkit/model - Tool Delegation Schemas
  *
- * Defines the execution strategy hierarchy for MCP tools:
+ * Defines the delegation hierarchy for MCP tools:
  * 1. "I can do it" - Local implementation (DEFAULT - self-reliant)
  * 2. "Someone else is better" - Delegate to host LLM via sampling (opt-in)
  * 3. "Emergency" - Neither works, escalate/error
@@ -13,24 +13,27 @@
 import { z } from "zod";
 
 // =============================================================================
-// Execution Strategy
+// Delegation Mode
 // =============================================================================
 
 /**
- * Tool execution strategy options
+ * Tool delegation mode options
  *
  * - local-only: Self-reliant, never delegate (DEFAULT)
  * - delegate-first: Try delegation, fallback to local
  * - delegate-only: Must delegate, error if unavailable
  */
-export const ExecutionStrategySchema = z
+export const DelegationModeSchema = z
   .enum(["local-only", "delegate-first", "delegate-only"])
   .default("local-only")
   .describe(
-    "Execution strategy: local-only (self-reliant, never delegate), " +
+    "Delegation mode: local-only (self-reliant, never delegate), " +
       "delegate-first (try sampling, fallback local), " +
       "delegate-only (must delegate, error if unavailable)"
   );
+
+/** @deprecated Use DelegationModeSchema instead */
+export const ExecutionStrategySchema = DelegationModeSchema;
 
 /**
  * Execution outcome for tracking what path was taken
@@ -97,15 +100,15 @@ export const ClientMetadataSchema = z
   .describe("Metadata about the connected client/LLM environment");
 
 // =============================================================================
-// Tool Strategy Configuration
+// Tool Delegation Configuration
 // =============================================================================
 
 /**
- * Per-tool strategy configuration
+ * Per-tool delegation configuration
  */
-export const ToolStrategyEntrySchema = z
+export const ToolDelegationEntrySchema = z
   .object({
-    strategy: ExecutionStrategySchema.describe("Execution strategy for this tool"),
+    mode: DelegationModeSchema.describe("Delegation mode for this tool"),
     delegationTimeout: z
       .number()
       .positive()
@@ -117,34 +120,40 @@ export const ToolStrategyEntrySchema = z
       .default(true)
       .describe("Whether to fall back to local on delegation failure"),
   })
-  .describe("Strategy configuration for a single tool");
+  .describe("Delegation configuration for a single tool");
+
+/** @deprecated Use ToolDelegationEntrySchema instead */
+export const ToolStrategyEntrySchema = ToolDelegationEntrySchema;
 
 /**
- * Per-tool strategy override configuration
+ * Per-tool delegation configuration map
  *
- * Allows configuring execution strategy on a per-tool basis.
+ * Allows configuring delegation mode on a per-tool basis.
  */
-export const ToolStrategyConfigSchema = z
+export const ToolDelegationConfigSchema = z
   .record(
     z
       .string()
       .min(1)
       .max(100), // Tool name
-    ToolStrategyEntrySchema
+    ToolDelegationEntrySchema
   )
   .default({})
-  .describe("Per-tool execution strategy overrides");
+  .describe("Per-tool delegation configuration");
+
+/** @deprecated Use ToolDelegationConfigSchema instead */
+export const ToolStrategyConfigSchema = ToolDelegationConfigSchema;
 
 // =============================================================================
-// Strategy Execution Result
+// Delegation Execution Result
 // =============================================================================
 
 /**
- * Result of strategy-based execution
+ * Result of delegation-based execution
  *
  * Provides observability into which path was taken and timing information.
  */
-export const StrategyExecutionResultSchema = z
+export const DelegationResultSchema = z
   .object({
     outcome: ExecutionOutcomeSchema.describe("Which execution path was taken"),
     result: z.unknown().describe("The actual execution result"),
@@ -152,16 +161,30 @@ export const StrategyExecutionResultSchema = z
     delegationError: z.string().optional().describe("Error message if delegation failed"),
     executionTimeMs: z.number().nonnegative().describe("Total execution time in milliseconds"),
   })
-  .describe("Result of strategy-based tool execution");
+  .describe("Result of delegation-based tool execution");
+
+/** @deprecated Use DelegationResultSchema instead */
+export const StrategyExecutionResultSchema = DelegationResultSchema;
 
 // =============================================================================
 // Type Exports
 // =============================================================================
 
-export type ExecutionStrategy = z.infer<typeof ExecutionStrategySchema>;
+// New types (preferred)
+export type DelegationMode = z.infer<typeof DelegationModeSchema>;
 export type ExecutionOutcome = z.infer<typeof ExecutionOutcomeSchema>;
 export type ClientCapabilities = z.infer<typeof ClientCapabilitiesSchema>;
 export type ClientMetadata = z.infer<typeof ClientMetadataSchema>;
-export type ToolStrategyEntry = z.infer<typeof ToolStrategyEntrySchema>;
-export type ToolStrategyConfig = z.infer<typeof ToolStrategyConfigSchema>;
-export type StrategyExecutionResult = z.infer<typeof StrategyExecutionResultSchema>;
+export type ToolDelegationEntry = z.infer<typeof ToolDelegationEntrySchema>;
+export type ToolDelegationConfig = z.infer<typeof ToolDelegationConfigSchema>;
+export type DelegationResult = z.infer<typeof DelegationResultSchema>;
+
+// Deprecated aliases for backward compatibility
+/** @deprecated Use DelegationMode instead */
+export type ExecutionStrategy = DelegationMode;
+/** @deprecated Use ToolDelegationEntry instead */
+export type ToolStrategyEntry = ToolDelegationEntry;
+/** @deprecated Use ToolDelegationConfig instead */
+export type ToolStrategyConfig = ToolDelegationConfig;
+/** @deprecated Use DelegationResult instead */
+export type StrategyExecutionResult = DelegationResult;

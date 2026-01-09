@@ -249,9 +249,9 @@ For tools that should optionally delegate to the host LLM, use `executeWithDeleg
 
 ```typescript
 // strategy/index.ts
-import { executeWithDelegation, resolveToolStrategy } from "@mcp-toolkit/mcp/strategy";
+import { executeWithDelegation, resolveToolDelegation } from "@mcp-toolkit/mcp/strategy";
 
-const strategyEntry = resolveToolStrategy("my_tool:subtask", context.defaultToolStrategies);
+const delegation = resolveToolDelegation("my_tool:subtask", context.defaultToolDelegations);
 
 const result = await executeWithDelegation(
   context.server,
@@ -266,9 +266,9 @@ const result = await executeWithDelegation(
     return localImplementation(args);
   },
   {
-    strategy: strategyEntry.strategy,  // "local-only" | "delegate-first" | "delegate-only"
+    mode: delegation.mode,  // "local-only" | "delegate-first" | "delegate-only"
     toolName: "my_tool:subtask",
-    fallbackEnabled: strategyEntry.fallbackEnabled,
+    fallbackEnabled: delegation.fallbackEnabled,
   }
 );
 ```
@@ -480,7 +480,7 @@ Zod schemas serve as the single source of truth for all types.
 | `SessionConfigSchema` | Session state | `schema.ts` |
 | `SessionFeaturesSchema` | Feature flags | `schema.ts` |
 | `ServerIdentitySchema` | Server metadata | `schema.ts` |
-| `ExecutionStrategySchema` | Delegation config | `strategy.ts` |
+| `DelegationModeSchema` | Delegation config | `strategy.ts` |
 | `ClientMetadataSchema` | Client info | `strategy.ts` |
 
 ### Pattern: Schema → Type → JSON Schema
@@ -550,7 +550,7 @@ mcp-toolkit init my-project --all-features
 packages/
 ├── model/src/           # Zod schemas (single source of truth)
 │   ├── schema.ts        # Core session/identity schemas
-│   ├── strategy.ts      # Delegation strategy schemas
+│   ├── strategy.ts      # Delegation mode schemas
 │   └── index.ts         # Exports
 ├── provider/src/        # Session persistence
 │   └── memory.ts        # In-memory provider

@@ -40,9 +40,9 @@ When a session is initialized, MCP Toolkit can optionally discover metadata abou
 
 ## Privacy Controls
 
-### Strategy Configuration
+### Delegation Configuration
 
-Client discovery behavior is controlled via the tool strategy configuration system. The default is `delegate-first` (attempt discovery, fall back gracefully).
+Client discovery behavior is controlled via the tool delegation configuration system. The default is `delegate-first` (attempt discovery, fall back gracefully).
 
 #### Option 1: Disable at Server Level
 
@@ -50,10 +50,10 @@ Client discovery behavior is controlled via the tool strategy configuration syst
 import { createServer } from "@mcp-toolkit/mcp";
 
 const server = createServer({
-  defaultToolStrategies: {
+  defaultToolDelegations: {
     // Disable client discovery entirely
     "session_init:client_discovery": {
-      strategy: "local-only",
+      mode: "local-only",
     },
   },
 });
@@ -82,10 +82,10 @@ await callTool("session_init", {
 });
 ```
 
-### Strategy Options
+### Delegation Mode Options
 
-| Strategy | Behavior | Privacy Impact |
-|----------|----------|----------------|
+| Mode | Behavior | Privacy Impact |
+|------|----------|----------------|
 | `local-only` | Never attempt discovery | No data collected |
 | `delegate-first` | Try discovery, fall back silently | Data collected if sampling available |
 | `delegate-only` | Require discovery, error if unavailable | Data collection required |
@@ -96,9 +96,9 @@ Out of the box, MCP Toolkit uses `delegate-first` for client discovery:
 
 ```typescript
 // packages/mcp/src/server.ts
-const DEFAULT_TOOL_STRATEGIES = {
+const DEFAULT_TOOL_DELEGATIONS = {
   "session_init:client_discovery": {
-    strategy: "delegate-first",
+    mode: "delegate-first",
     fallbackEnabled: true,
   },
 };
@@ -138,9 +138,9 @@ If you implement a custom `SessionProvider` that persists data, client metadata 
 ```typescript
 // Maximum privacy configuration
 const server = createServer({
-  defaultToolStrategies: {
+  defaultToolDelegations: {
     "session_init:client_discovery": {
-      strategy: "local-only",
+      mode: "local-only",
     },
   },
 });
@@ -151,9 +151,9 @@ const server = createServer({
 ```typescript
 // Full discovery for debugging
 const server = createServer({
-  defaultToolStrategies: {
+  defaultToolDelegations: {
     "session_init:client_discovery": {
-      strategy: "delegate-first",
+      mode: "delegate-first",
     },
   },
 });
@@ -161,7 +161,7 @@ const server = createServer({
 
 ## Related Configuration
 
-- [Tool Strategy Configuration](./tool-strategies.md) - Full strategy system documentation
+- [Tool Delegation](./tool-delegation.md) - Full delegation system documentation
 - [Session Management](./sessions.md) - Session lifecycle and storage
 
 ## Questions?

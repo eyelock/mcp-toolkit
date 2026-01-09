@@ -11,7 +11,7 @@ import {
   type SessionConfig,
   SessionConfigSchema,
   SessionFeaturesSchema,
-  ToolStrategyConfigSchema,
+  ToolDelegationConfigSchema,
   type SessionInitInput,
   type SessionUpdateInput,
 } from "@mcp-toolkit/model";
@@ -25,15 +25,15 @@ export class MemoryProvider implements SessionProvider {
     try {
       const now = new Date().toISOString();
 
-      // Apply defaults to features and tool strategies
+      // Apply defaults to features and tool delegations
       const features = SessionFeaturesSchema.parse(input.features ?? {});
-      const toolStrategies = ToolStrategyConfigSchema.parse({});
+      const toolDelegations = ToolDelegationConfigSchema.parse({});
 
       const config: SessionConfig = {
         projectName: input.projectName,
         features,
         clientMetadata: input.clientMetadata,
-        toolStrategies,
+        toolDelegations,
         createdAt: now,
         updatedAt: now,
       };

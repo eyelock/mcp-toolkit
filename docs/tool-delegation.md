@@ -78,20 +78,20 @@ Control delegation at the server level:
 import { createServer } from "@mcp-toolkit/mcp";
 
 const server = createServer({
-  defaultToolStrategies: {
+  defaultToolDelegations: {
     // Use local-only (never delegate)
     "session_init:client_discovery": {
-      strategy: "local-only",
+      mode: "local-only",
     },
 
     // Or require delegation (error if unavailable)
     "my_tool:summarize": {
-      strategy: "delegate-only",
+      mode: "delegate-only",
     },
 
     // Or try delegation with fallback (default for client discovery)
     "my_tool:analyze": {
-      strategy: "delegate-first",
+      mode: "delegate-first",
       delegationTimeout: 60000, // 60 seconds
       fallbackEnabled: true,
     },
@@ -110,12 +110,12 @@ const TOOL_NAME = "my_tool";
 const DELEGATION_TASK = `${TOOL_NAME}:summarize`;
 ```
 
-### Step 2: Import the Strategy Utilities
+### Step 2: Import the Delegation Utilities
 
 ```typescript
 import {
   executeWithDelegation,
-  resolveToolStrategy
+  resolveToolDelegation
 } from "@mcp-toolkit/mcp/strategy";
 ```
 
@@ -127,10 +127,10 @@ import type { ServerContext } from "@mcp-toolkit/mcp";
 async function handleMyTool(args: unknown, context: ServerContext) {
   const { text } = args as { text: string };
 
-  // Resolve strategy from configuration
-  const strategyEntry = resolveToolStrategy(
+  // Resolve delegation from configuration
+  const delegation = resolveToolDelegation(
     DELEGATION_TASK,
-    context.defaultToolStrategies
+    context.defaultToolDelegations
   );
 
   const result = await executeWithDelegation(
@@ -161,10 +161,10 @@ async function handleMyTool(args: unknown, context: ServerContext) {
     },
 
     {
-      strategy: strategyEntry.strategy,
+      mode: delegation.mode,
       toolName: DELEGATION_TASK,
-      delegationTimeout: strategyEntry.delegationTimeout,
-      fallbackEnabled: strategyEntry.fallbackEnabled,
+      delegationTimeout: delegation.delegationTimeout,
+      fallbackEnabled: delegation.fallbackEnabled,
     }
   );
 
@@ -182,7 +182,7 @@ async function handleMyTool(args: unknown, context: ServerContext) {
 The `executeWithDelegation` function returns detailed outcome information:
 
 ```typescript
-interface StrategyExecutionResult {
+interface DelegationResult {
   outcome: "delegated" | "local" | "fallback-local" | "error";
   result: unknown;
   delegationAttempted: boolean;
@@ -206,12 +206,12 @@ if (result.outcome === "delegated") {
 }
 ```
 
-## Strategy Reference
+## Delegation Mode Reference
 
-### Strategies
+### Modes
 
-| Strategy | Behavior | Use When |
-|----------|----------|----------|
+| Mode | Behavior | Use When |
+|------|----------|----------|
 | `local-only` | Never delegate, always use local implementation | You don't need LLM help, or privacy is critical |
 | `delegate-first` | Try delegation, fall back to local on failure | LLM is better but you have a reasonable fallback |
 | `delegate-only` | Must delegate, error if sampling unavailable | Only the LLM can do this, no local fallback makes sense |
@@ -219,9 +219,9 @@ if (result.outcome === "delegated") {
 ### Configuration Options
 
 ```typescript
-interface ToolStrategyEntry {
-  // Which strategy to use
-  strategy: "local-only" | "delegate-first" | "delegate-only";
+interface ToolDelegationEntry {
+  // Which mode to use
+  mode: "local-only" | "delegate-first" | "delegate-only";
 
   // Timeout for delegation attempts (default: 30000ms)
   delegationTimeout?: number;
@@ -254,7 +254,7 @@ import type { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ServerContext } from "@mcp-toolkit/mcp";
 import {
   executeWithDelegation,
-  resolveToolStrategy,
+  resolveToolDelegation,
   extractTextFromSamplingResponse,
 } from "@mcp-toolkit/mcp/strategy";
 
@@ -283,7 +283,7 @@ export async function handleCodeReview(
     language?: string;
   };
 
-  const strategyEntry = resolveToolStrategy(REVIEW_TASK, context.defaultToolStrategies);
+  const delegation = resolveToolDelegation(REVIEW_TASK, context.defaultToolDelegations);
 
   const result = await executeWithDelegation(
     context.server,
@@ -325,10 +325,10 @@ export async function handleCodeReview(
     },
 
     {
-      strategy: strategyEntry.strategy,
+      mode: delegation.mode,
       toolName: REVIEW_TASK,
-      delegationTimeout: strategyEntry.delegationTimeout ?? 60000,
-      fallbackEnabled: strategyEntry.fallbackEnabled,
+      delegationTimeout: delegation.delegationTimeout ?? 60000,
+      fallbackEnabled: delegation.fallbackEnabled,
     }
   );
 
@@ -349,7 +349,7 @@ export async function handleCodeReview(
 
 ### DelegationUnavailableError
 
-Thrown when `delegate-only` strategy is used but sampling isn't available:
+Thrown when `delegate-only` mode is used but sampling isn't available:
 
 ```typescript
 import { DelegationUnavailableError } from "@mcp-toolkit/mcp/strategy";

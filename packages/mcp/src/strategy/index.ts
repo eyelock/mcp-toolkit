@@ -1,7 +1,7 @@
 /**
- * Composite Tool Execution Strategy
+ * Tool Delegation
  *
- * Implements the tri-state execution hierarchy:
+ * Implements the tri-state delegation hierarchy:
  * 1. "I can do it" - Local implementation (DEFAULT - self-reliant)
  * 2. "Someone else is better" - Delegate to host LLM via sampling (opt-in)
  * 3. "Emergency" - Neither works, escalate/error
@@ -13,11 +13,11 @@
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
 import type {
-  ExecutionStrategy,
+  DelegationMode,
   ExecutionOutcome,
-  StrategyExecutionResult,
-  ToolStrategyConfig,
-  ToolStrategyEntry,
+  DelegationResult,
+  ToolDelegationConfig,
+  ToolDelegationEntry,
 } from "@mcp-toolkit/model";
 import { logDebug, logWarning } from "../logging.js";
 
@@ -28,61 +28,64 @@ import { logDebug, logWarning } from "../logging.js";
 /** Default timeout for delegation attempts (30 seconds) */
 export const DEFAULT_DELEGATION_TIMEOUT_MS = 30_000;
 
-/** Default strategy entry when no config is provided */
-const DEFAULT_STRATEGY_ENTRY: ToolStrategyEntry = {
-  strategy: "local-only",
+/** Default delegation entry when no config is provided */
+const DEFAULT_DELEGATION_ENTRY: ToolDelegationEntry = {
+  mode: "local-only",
   fallbackEnabled: true,
 };
 
 // =============================================================================
-// Strategy Resolution
+// Delegation Resolution
 // =============================================================================
 
 /**
- * Resolve the execution strategy for a tool from configuration
+ * Resolve the delegation configuration for a tool
  *
  * Looks up the tool in the config, falling back to defaults if not found.
- * This is the primary way tools should get their strategy configuration.
+ * This is the primary way tools should get their delegation configuration.
  *
- * @param toolName - Name of the tool to resolve strategy for
- * @param config - Tool strategy configuration (from ServerContext.defaultToolStrategies)
- * @returns Resolved strategy entry with all defaults applied
+ * @param toolName - Name of the tool to resolve delegation for
+ * @param config - Tool delegation configuration (from ServerContext.defaultToolDelegations)
+ * @returns Resolved delegation entry with all defaults applied
  *
  * @example
  * ```typescript
- * const strategyEntry = resolveToolStrategy(
+ * const delegation = resolveToolDelegation(
  *   "session_init:client_discovery",
- *   context.defaultToolStrategies
+ *   context.defaultToolDelegations
  * );
- * // Use in executeWithStrategy
- * await executeWithStrategy(server, args, delegateFn, localFn, {
- *   strategy: strategyEntry.strategy,
- *   delegationTimeout: strategyEntry.delegationTimeout,
- *   fallbackEnabled: strategyEntry.fallbackEnabled,
+ * // Use in executeWithDelegation
+ * await executeWithDelegation(server, args, delegateFn, localFn, {
+ *   mode: delegation.mode,
+ *   delegationTimeout: delegation.delegationTimeout,
+ *   fallbackEnabled: delegation.fallbackEnabled,
  *   toolName: "session_init:client_discovery",
  * });
  * ```
  */
-export function resolveToolStrategy(
+export function resolveToolDelegation(
   toolName: string,
-  config?: ToolStrategyConfig
-): ToolStrategyEntry {
+  config?: ToolDelegationConfig
+): ToolDelegationEntry {
   if (!config) {
-    return DEFAULT_STRATEGY_ENTRY;
+    return DEFAULT_DELEGATION_ENTRY;
   }
 
   const entry = config[toolName];
   if (!entry) {
-    return DEFAULT_STRATEGY_ENTRY;
+    return DEFAULT_DELEGATION_ENTRY;
   }
 
   // Merge with defaults (entry may have partial fields)
   return {
-    strategy: entry.strategy ?? DEFAULT_STRATEGY_ENTRY.strategy,
+    mode: entry.mode ?? DEFAULT_DELEGATION_ENTRY.mode,
     delegationTimeout: entry.delegationTimeout,
-    fallbackEnabled: entry.fallbackEnabled ?? DEFAULT_STRATEGY_ENTRY.fallbackEnabled,
+    fallbackEnabled: entry.fallbackEnabled ?? DEFAULT_DELEGATION_ENTRY.fallbackEnabled,
   };
 }
+
+/** @deprecated Use resolveToolDelegation instead */
+export const resolveToolStrategy = resolveToolDelegation;
 
 // =============================================================================
 // Capability Checking
@@ -123,7 +126,7 @@ export function getClientCapabilities(
 }
 
 // =============================================================================
-// Strategy Executor Types
+// Delegation Executor Types
 // =============================================================================
 
 /**
@@ -152,8 +155,8 @@ export type LocalExecutionFn<TArgs, TResult> = (args: TArgs) => Promise<TResult>
  * Delegation executor options
  */
 export interface DelegationOptions {
-  /** Execution strategy to use */
-  strategy: ExecutionStrategy;
+  /** Delegation mode to use */
+  mode: DelegationMode;
   /** Timeout for delegation attempts in milliseconds */
   delegationTimeout?: number;
   /** Whether to fall back to local on delegation failure (default: true) */
@@ -231,7 +234,7 @@ export class ExecutionStrategyError extends Error {
  *     // Local fallback - we don't know
  *     return "unknown";
  *   },
- *   { strategy: "delegate-first", toolName: "client_discovery" }
+ *   { mode: "delegate-first", toolName: "client_discovery" }
  * );
  * ```
  */
@@ -241,9 +244,9 @@ export async function executeWithDelegation<TArgs, TResult>(
   delegateFn: DelegationFn<TArgs, TResult>,
   localFn: LocalExecutionFn<TArgs, TResult>,
   options: DelegationOptions
-): Promise<StrategyExecutionResult> {
+): Promise<DelegationResult> {
   const {
-    strategy,
+    mode,
     delegationTimeout = DEFAULT_DELEGATION_TIMEOUT_MS,
     fallbackEnabled = true,
     toolName = "unknown",
@@ -254,7 +257,7 @@ export async function executeWithDelegation<TArgs, TResult>(
   let delegationError: string | undefined;
 
   // Helper to build result
-  const buildResult = (outcome: ExecutionOutcome, result: unknown): StrategyExecutionResult => ({
+  const buildResult = (outcome: ExecutionOutcome, result: unknown): DelegationResult => ({
     outcome,
     result,
     delegationAttempted,
@@ -265,19 +268,19 @@ export async function executeWithDelegation<TArgs, TResult>(
   // Check sampling availability
   const samplingAvailable = clientSupportsSampling(server);
 
-  logDebug(`Strategy execution: ${toolName}`, {
+  logDebug(`Delegation execution: ${toolName}`, {
     metadata: {
-      strategy,
+      mode,
       samplingAvailable,
       delegationTimeout,
     },
   });
 
   // ==========================================================================
-  // Strategy: local-only (DEFAULT)
+  // Mode: local-only (DEFAULT)
   // "I can do it" - never delegate
   // ==========================================================================
-  if (strategy === "local-only") {
+  if (mode === "local-only") {
     try {
       const result = await localFn(args);
       return buildResult("local", result);
@@ -291,10 +294,10 @@ export async function executeWithDelegation<TArgs, TResult>(
   }
 
   // ==========================================================================
-  // Strategy: delegate-only
+  // Mode: delegate-only
   // "Someone else MUST do it" - error if unavailable
   // ==========================================================================
-  if (strategy === "delegate-only") {
+  if (mode === "delegate-only") {
     if (!samplingAvailable || !server) {
       throw new DelegationUnavailableError(
         `Tool ${toolName} requires delegation but client does not support sampling`
@@ -314,7 +317,7 @@ export async function executeWithDelegation<TArgs, TResult>(
   }
 
   // ==========================================================================
-  // Strategy: delegate-first
+  // Mode: delegate-first
   // "Someone else is better" - try delegation, fallback to local
   // ==========================================================================
   if (samplingAvailable && server) {
@@ -386,11 +389,134 @@ export function extractTextFromSamplingResponse(result: CreateMessageResult): st
 }
 
 // =============================================================================
+// Tool Classification
+// =============================================================================
+
+/**
+ * Tool classification based on delegation behavior
+ *
+ * This classification is inferred from the delegation configuration at runtime:
+ * - SamplingTool: Requires or benefits from LLM sampling (delegate-first, delegate-only)
+ * - ImplementationTool: Fully implemented locally (local-only)
+ *
+ * Use this to categorize tools for documentation, UI, or capability discovery.
+ */
+export type ToolClassification = "sampling" | "implementation";
+
+/**
+ * Classify a tool based on its delegation mode
+ *
+ * @param mode - The delegation mode of the tool
+ * @returns "sampling" if the tool uses or requires LLM delegation, "implementation" otherwise
+ *
+ * @example
+ * ```typescript
+ * const delegation = resolveToolDelegation("my_tool:subtask", config);
+ * const classification = classifyTool(delegation.mode);
+ * // classification: "sampling" or "implementation"
+ * ```
+ */
+export function classifyTool(mode: DelegationMode): ToolClassification {
+  return mode === "local-only" ? "implementation" : "sampling";
+}
+
+/**
+ * Classify a tool by name from the delegation configuration
+ *
+ * @param toolName - The tool name to classify
+ * @param config - Tool delegation configuration
+ * @returns Tool classification based on its configured delegation mode
+ *
+ * @example
+ * ```typescript
+ * const classification = classifyToolByName(
+ *   "session_init:client_discovery",
+ *   context.defaultToolDelegations
+ * );
+ * // classification: "sampling" (if configured as delegate-first)
+ * ```
+ */
+export function classifyToolByName(
+  toolName: string,
+  config?: ToolDelegationConfig
+): ToolClassification {
+  const delegation = resolveToolDelegation(toolName, config);
+  return classifyTool(delegation.mode);
+}
+
+/**
+ * Get all tools of a specific classification from the configuration
+ *
+ * @param classification - The classification to filter by
+ * @param config - Tool delegation configuration
+ * @returns Array of tool names matching the classification
+ *
+ * @example
+ * ```typescript
+ * // Get all sampling tools
+ * const samplingTools = getToolsByClassification("sampling", config);
+ * // ["session_init:client_discovery", "code_review:analyze", ...]
+ *
+ * // Get all local implementation tools
+ * const implTools = getToolsByClassification("implementation", config);
+ * // ["server_info", "session_status", ...]
+ * ```
+ */
+export function getToolsByClassification(
+  classification: ToolClassification,
+  config?: ToolDelegationConfig
+): string[] {
+  if (!config) return [];
+
+  return Object.entries(config)
+    .filter(([_, entry]) => {
+      const mode = entry.mode ?? "local-only";
+      return classifyTool(mode) === classification;
+    })
+    .map(([toolName]) => toolName);
+}
+
+/**
+ * Check if a tool requires sampling to function
+ *
+ * Returns true only if the tool is configured as "delegate-only".
+ *
+ * @param toolName - The tool name to check
+ * @param config - Tool delegation configuration
+ * @returns true if the tool requires sampling (delegate-only mode)
+ */
+export function toolRequiresSampling(toolName: string, config?: ToolDelegationConfig): boolean {
+  const delegation = resolveToolDelegation(toolName, config);
+  return delegation.mode === "delegate-only";
+}
+
+/**
+ * Check if a tool can benefit from sampling but doesn't require it
+ *
+ * Returns true if the tool is configured as "delegate-first".
+ *
+ * @param toolName - The tool name to check
+ * @param config - Tool delegation configuration
+ * @returns true if the tool benefits from sampling (delegate-first mode)
+ */
+export function toolBenefitsFromSampling(toolName: string, config?: ToolDelegationConfig): boolean {
+  const delegation = resolveToolDelegation(toolName, config);
+  return delegation.mode === "delegate-first";
+}
+
+// =============================================================================
 // Re-exports for convenience
 // =============================================================================
 
 export type {
-  ExecutionStrategy,
+  DelegationMode,
   ExecutionOutcome,
+  DelegationResult,
+  ToolDelegationConfig,
+  ToolDelegationEntry,
+  // Deprecated aliases
+  ExecutionStrategy,
   StrategyExecutionResult,
+  ToolStrategyConfig,
+  ToolStrategyEntry,
 } from "@mcp-toolkit/model";

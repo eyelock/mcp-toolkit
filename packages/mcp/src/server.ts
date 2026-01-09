@@ -2,10 +2,10 @@
  * MCP Server Setup
  *
  * Creates and configures the MCP server with tools, resources, and prompts.
- * Supports the composite execution strategy pattern for tool delegation.
+ * Supports the tool delegation pattern.
  */
 
-import type { ServerIdentity, ToolStrategyConfig } from "@mcp-toolkit/model";
+import type { ServerIdentity, ToolDelegationConfig } from "@mcp-toolkit/model";
 import type { SessionProvider } from "@mcp-toolkit/provider";
 import { createMemoryProvider } from "@mcp-toolkit/provider";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -22,7 +22,7 @@ import { handleResourceRead, registerResources } from "./resources/index.js";
 import { handleToolCall, registerTools } from "./tools/index.js";
 
 /**
- * Default tool strategies for out-of-the-box functionality
+ * Default tool delegations for out-of-the-box functionality
  *
  * Tools default to "local-only" (self-reliant), but certain tools
  * benefit from delegation when the LLM knows better.
@@ -30,10 +30,10 @@ import { handleToolCall, registerTools } from "./tools/index.js";
  * Client discovery is configured as "delegate-first" because only
  * the LLM knows what model it is - this is a perfect delegation case.
  */
-const DEFAULT_TOOL_STRATEGIES: ToolStrategyConfig = {
+const DEFAULT_TOOL_DELEGATIONS: ToolDelegationConfig = {
   // Client discovery: Only the LLM knows its own model identifier
   "session_init:client_discovery": {
-    strategy: "delegate-first",
+    mode: "delegate-first",
     fallbackEnabled: true,
   },
 };
@@ -43,8 +43,8 @@ export interface ServerConfig {
   version?: string;
   provider?: SessionProvider;
   identity?: ServerIdentity;
-  /** Default tool execution strategies */
-  defaultToolStrategies?: ToolStrategyConfig;
+  /** Default tool delegation configuration */
+  defaultToolDelegations?: ToolDelegationConfig;
 }
 
 export function createServer(config: ServerConfig = {}): Server {
@@ -53,13 +53,13 @@ export function createServer(config: ServerConfig = {}): Server {
     version = "0.0.0",
     provider = createMemoryProvider(),
     identity = { canonicalName: name, tags: {} },
-    defaultToolStrategies = {},
+    defaultToolDelegations = {},
   } = config;
 
-  // Merge user-provided strategies with defaults (user overrides take precedence)
-  const mergedStrategies: ToolStrategyConfig = {
-    ...DEFAULT_TOOL_STRATEGIES,
-    ...defaultToolStrategies,
+  // Merge user-provided delegations with defaults (user overrides take precedence)
+  const mergedDelegations: ToolDelegationConfig = {
+    ...DEFAULT_TOOL_DELEGATIONS,
+    ...defaultToolDelegations,
   };
 
   const server = new Server(
@@ -74,14 +74,14 @@ export function createServer(config: ServerConfig = {}): Server {
   );
 
   // Store provider, identity, and server in context for handlers
-  // Server instance is needed for sampling access in composite strategy execution
+  // Server instance is needed for sampling access in tool delegation
   const context: ServerContext = {
     server,
     provider,
     identity,
     name,
     version,
-    defaultToolStrategies: mergedStrategies,
+    defaultToolDelegations: mergedDelegations,
   };
 
   // Register tool handlers
@@ -125,6 +125,6 @@ export type ServerContext = {
   name: string;
   /** Server version */
   version: string;
-  /** Default tool execution strategies */
-  defaultToolStrategies?: ToolStrategyConfig;
+  /** Default tool delegation configuration */
+  defaultToolDelegations?: ToolDelegationConfig;
 };

@@ -6,13 +6,19 @@ import { describe, it, expect, vi } from "vitest";
 import {
   LOG_ENTRIES_TEMPLATE,
   FEATURE_CONFIG_TEMPLATE,
+  DELEGATION_CONFIG_TEMPLATE,
   resourceTemplates,
   registerResourceTemplates,
   extractTemplateParams,
   matchesTemplate,
   readLogEntries,
   readFeatureConfig,
+  readDelegationConfig,
   handleTemplatedResourceRead,
+  registerTemplate,
+  getRegisteredTemplates,
+  initializeTemplateRegistry,
+  handleTemplatedResourceReadFromRegistry,
 } from "./templates.js";
 import type { ServerContext } from "../server.js";
 
@@ -29,10 +35,17 @@ describe("Resource Templates", () => {
       expect(FEATURE_CONFIG_TEMPLATE.name).toBe("Feature Configuration");
     });
 
+    it("defines delegation config template with correct structure", () => {
+      expect(DELEGATION_CONFIG_TEMPLATE.uriTemplate).toBe("delegation:///{tool}");
+      expect(DELEGATION_CONFIG_TEMPLATE.name).toBe("Tool Delegation Configuration");
+      expect(DELEGATION_CONFIG_TEMPLATE.mimeType).toBe("application/json");
+    });
+
     it("includes all templates in resourceTemplates array", () => {
-      expect(resourceTemplates).toHaveLength(2);
+      expect(resourceTemplates).toHaveLength(3);
       expect(resourceTemplates).toContain(LOG_ENTRIES_TEMPLATE);
       expect(resourceTemplates).toContain(FEATURE_CONFIG_TEMPLATE);
+      expect(resourceTemplates).toContain(DELEGATION_CONFIG_TEMPLATE);
     });
   });
 
@@ -40,9 +53,10 @@ describe("Resource Templates", () => {
     it("returns all resource templates", () => {
       const result = registerResourceTemplates();
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result[0].uriTemplate).toBe("log:///{date}");
       expect(result[1].uriTemplate).toBe("config:///{feature}");
+      expect(result[2].uriTemplate).toBe("delegation:///{tool}");
     });
   });
 
@@ -210,6 +224,67 @@ describe("Resource Templates", () => {
     });
   });
 
+  describe("readDelegationConfig", () => {
+    it("returns delegation config for configured tool", async () => {
+      const mockContext = {
+        defaultToolDelegations: {
+          "session_init:client_discovery": {
+            mode: "delegate-first",
+            fallbackEnabled: true,
+            delegationTimeout: 30000,
+          },
+        },
+      } as unknown as ServerContext;
+
+      const result = await readDelegationConfig("session_init:client_discovery", mockContext);
+
+      expect(result.contents).toHaveLength(1);
+      expect(result.contents[0].uri).toBe("delegation:///session_init:client_discovery");
+      const data = JSON.parse(result.contents[0].text as string);
+      expect(data.tool).toBe("session_init:client_discovery");
+      expect(data.configured).toBe(true);
+      expect(data.settings.mode).toBe("delegate-first");
+      expect(data.settings.fallbackEnabled).toBe(true);
+      expect(data.settings.delegationTimeout).toBe(30000);
+    });
+
+    it("returns default config for unconfigured tool", async () => {
+      const mockContext = {
+        defaultToolDelegations: {},
+      } as unknown as ServerContext;
+
+      const result = await readDelegationConfig("some_tool:subtask", mockContext);
+
+      const data = JSON.parse(result.contents[0].text as string);
+      expect(data.tool).toBe("some_tool:subtask");
+      expect(data.configured).toBe(false);
+      expect(data.settings.mode).toBe("local-only");
+      expect(data.settings.fallbackEnabled).toBe(true);
+    });
+
+    it("handles missing defaultToolDelegations", async () => {
+      const mockContext = {} as unknown as ServerContext;
+
+      const result = await readDelegationConfig("any_tool", mockContext);
+
+      const data = JSON.parse(result.contents[0].text as string);
+      expect(data.configured).toBe(false);
+      expect(data.settings.mode).toBe("local-only");
+    });
+
+    it("includes available modes and description", async () => {
+      const mockContext = {
+        defaultToolDelegations: {},
+      } as unknown as ServerContext;
+
+      const result = await readDelegationConfig("test_tool", mockContext);
+
+      const data = JSON.parse(result.contents[0].text as string);
+      expect(data.availableModes).toEqual(["local-only", "delegate-first", "delegate-only"]);
+      expect(data.description).toContain("execute locally");
+    });
+  });
+
   describe("handleTemplatedResourceRead", () => {
     it("routes log URIs to readLogEntries", async () => {
       const mockContext = {} as ServerContext;
@@ -237,6 +312,24 @@ describe("Resource Templates", () => {
       expect(data.feature).toBe("tools");
     });
 
+    it("routes delegation URIs to readDelegationConfig", async () => {
+      const mockContext = {
+        defaultToolDelegations: {
+          "code_review:analyze": { mode: "delegate-only" },
+        },
+      } as unknown as ServerContext;
+
+      const result = await handleTemplatedResourceRead(
+        "delegation:///code_review:analyze",
+        mockContext
+      );
+
+      expect(result).not.toBeNull();
+      const data = JSON.parse(result!.contents[0].text as string);
+      expect(data.tool).toBe("code_review:analyze");
+      expect(data.settings.mode).toBe("delegate-only");
+    });
+
     it("returns null for unmatched URIs", async () => {
       const mockContext = {} as ServerContext;
 
@@ -251,6 +344,56 @@ describe("Resource Templates", () => {
       const result = await handleTemplatedResourceRead("session://current", mockContext);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("Template Registry", () => {
+    it("registerTemplate adds template to registry", () => {
+      const customTemplate = {
+        uriTemplate: "custom:///{id}",
+        name: "Custom Resource",
+        description: "A custom resource template",
+        mimeType: "application/json",
+      };
+
+      registerTemplate(customTemplate, async (params) => ({
+        contents: [
+          {
+            uri: `custom:///${params.id}`,
+            mimeType: "application/json",
+            text: JSON.stringify({ id: params.id }),
+          },
+        ],
+      }));
+
+      const templates = getRegisteredTemplates();
+      expect(templates.some((t) => t.uriTemplate === "custom:///{id}")).toBe(true);
+    });
+
+    it("initializeTemplateRegistry registers built-in templates", () => {
+      initializeTemplateRegistry();
+
+      const templates = getRegisteredTemplates();
+      expect(templates.some((t) => t.uriTemplate === "log:///{date}")).toBe(true);
+      expect(templates.some((t) => t.uriTemplate === "config:///{feature}")).toBe(true);
+      expect(templates.some((t) => t.uriTemplate === "delegation:///{tool}")).toBe(true);
+    });
+
+    it("handleTemplatedResourceReadFromRegistry routes correctly", async () => {
+      initializeTemplateRegistry();
+
+      const mockContext = {
+        defaultToolDelegations: {},
+      } as unknown as ServerContext;
+
+      const result = await handleTemplatedResourceReadFromRegistry(
+        "log:///2024-01-15",
+        mockContext
+      );
+
+      expect(result).not.toBeNull();
+      const data = JSON.parse(result!.contents[0].text as string);
+      expect(data.date).toBe("2024-01-15");
     });
   });
 });

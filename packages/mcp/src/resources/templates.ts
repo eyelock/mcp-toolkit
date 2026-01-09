@@ -5,12 +5,36 @@
  * Resource templates use URI Templates (RFC 6570) to define resources
  * that can be accessed with dynamic parameters.
  *
+ * ## Template Pattern
+ *
+ * Each template follows this pattern:
+ * 1. Define the ResourceTemplate with uriTemplate, name, description
+ * 2. Create a handler function that receives extracted params + context
+ * 3. Register the template with its handler in the registry
+ *
+ * ## URI Template Syntax (RFC 6570 subset)
+ *
+ * - `{var}` - Simple string expansion
+ * - Multiple params: `resource:///{type}/{id}`
+ *
  * @see https://modelcontextprotocol.io/specification/2025-06-18/server/resources
  * @see https://datatracker.ietf.org/doc/html/rfc6570
  */
 
 import type { ReadResourceResult, ResourceTemplate } from "@modelcontextprotocol/sdk/types.js";
 import type { ServerContext } from "../server.js";
+
+// =============================================================================
+// Template Handler Types
+// =============================================================================
+
+/**
+ * Handler function for a resource template
+ */
+export type TemplateHandler = (
+  params: Record<string, string>,
+  context: ServerContext
+) => Promise<ReadResourceResult>;
 
 /**
  * Log entries resource template
@@ -47,11 +71,66 @@ export const FEATURE_CONFIG_TEMPLATE: ResourceTemplate = {
 };
 
 /**
- * All available resource templates
+ * Delegation configuration resource template
+ *
+ * This template demonstrates a multi-parameter resource.
+ * Access delegation configuration for specific tools and their modes.
+ *
+ * Example URIs:
+ * - delegation:///session_init:client_discovery (specific delegation point)
+ * - delegation:///code_review:analyze (code review tool delegation)
+ *
+ * Parameters:
+ * - {tool} - Tool name (may include : for delegation points like "session_init:client_discovery")
+ */
+export const DELEGATION_CONFIG_TEMPLATE: ResourceTemplate = {
+  uriTemplate: "delegation:///{tool}",
+  name: "Tool Delegation Configuration",
+  description: "Delegation configuration for a specific tool or delegation point",
+  mimeType: "application/json",
+};
+
+// =============================================================================
+// Template Registry
+// =============================================================================
+
+/**
+ * Template registry entry combining template definition with handler
+ */
+interface TemplateRegistryEntry {
+  template: ResourceTemplate;
+  handler: TemplateHandler;
+}
+
+/**
+ * Template registry - maps URI templates to their handlers
+ *
+ * Using a Map provides O(1) lookup and maintains insertion order.
+ * Each entry combines the ResourceTemplate metadata with its handler function.
+ */
+const templateRegistry = new Map<string, TemplateRegistryEntry>();
+
+/**
+ * Register a resource template with its handler
+ */
+export function registerTemplate(template: ResourceTemplate, handler: TemplateHandler): void {
+  templateRegistry.set(template.uriTemplate, { template, handler });
+}
+
+/**
+ * Get all registered templates
+ */
+export function getRegisteredTemplates(): ResourceTemplate[] {
+  return Array.from(templateRegistry.values()).map((entry) => entry.template);
+}
+
+/**
+ * All available resource templates (for backward compatibility)
  */
 export const resourceTemplates: ResourceTemplate[] = [
   LOG_ENTRIES_TEMPLATE,
   FEATURE_CONFIG_TEMPLATE,
+  DELEGATION_CONFIG_TEMPLATE,
 ];
 
 /**
@@ -260,9 +339,60 @@ function getFeatureDescription(feature: string): string {
 }
 
 /**
+ * Read delegation configuration for a specific tool
+ *
+ * @param tool - Tool name or delegation point (e.g., "session_init:client_discovery")
+ * @param context - Server context
+ */
+export async function readDelegationConfig(
+  tool: string,
+  context: ServerContext
+): Promise<ReadResourceResult> {
+  // Get the delegation config from context
+  const delegationConfig = context.defaultToolDelegations ?? {};
+  const toolConfig = delegationConfig[tool];
+
+  // Build response showing current configuration
+  const config = {
+    tool,
+    configured: toolConfig !== undefined,
+    settings: toolConfig ?? {
+      mode: "local-only",
+      fallbackEnabled: true,
+      delegationTimeout: undefined,
+    },
+    availableModes: ["local-only", "delegate-first", "delegate-only"],
+    description: getDelegationModeDescription(toolConfig?.mode ?? "local-only"),
+  };
+
+  return {
+    contents: [
+      {
+        uri: `delegation:///${tool}`,
+        mimeType: "application/json",
+        text: JSON.stringify(config, null, 2),
+      },
+    ],
+  };
+}
+
+/**
+ * Get description for a delegation mode
+ */
+function getDelegationModeDescription(mode: string): string {
+  const descriptions: Record<string, string> = {
+    "local-only": "Always execute locally, never delegate to host LLM",
+    "delegate-first": "Try delegating to host LLM first, fallback to local on failure",
+    "delegate-only": "Must delegate to host LLM, error if sampling unavailable",
+  };
+  return descriptions[mode] ?? "Unknown mode";
+}
+
+/**
  * Handle a templated resource read
  *
  * This function routes templated URIs to their appropriate handlers.
+ * Templates are checked in order of specificity (most specific first).
  */
 export async function handleTemplatedResourceRead(
   uri: string,
@@ -280,6 +410,58 @@ export async function handleTemplatedResourceRead(
     return readFeatureConfig(configParams.feature, context);
   }
 
+  // Try delegation config template
+  const delegationParams = extractTemplateParams(DELEGATION_CONFIG_TEMPLATE.uriTemplate, uri);
+  if (delegationParams?.tool) {
+    return readDelegationConfig(delegationParams.tool, context);
+  }
+
   // No template matched
+  return null;
+}
+
+// =============================================================================
+// Registry Initialization
+// =============================================================================
+
+/**
+ * Initialize the template registry with all built-in templates
+ *
+ * This function registers all built-in templates with their handlers.
+ * Custom templates can be added after initialization using registerTemplate().
+ */
+export function initializeTemplateRegistry(): void {
+  // Log entries - date-based logs
+  registerTemplate(LOG_ENTRIES_TEMPLATE, async (params, context) => {
+    return readLogEntries(params.date ?? "", context);
+  });
+
+  // Feature config - MCP feature settings
+  registerTemplate(FEATURE_CONFIG_TEMPLATE, async (params, context) => {
+    return readFeatureConfig(params.feature ?? "", context);
+  });
+
+  // Delegation config - tool delegation settings
+  registerTemplate(DELEGATION_CONFIG_TEMPLATE, async (params, context) => {
+    return readDelegationConfig(params.tool ?? "", context);
+  });
+}
+
+/**
+ * Handle a templated resource read using the registry
+ *
+ * This is an alternative to handleTemplatedResourceRead that uses
+ * the template registry. Use this for custom template extensions.
+ */
+export async function handleTemplatedResourceReadFromRegistry(
+  uri: string,
+  context: ServerContext
+): Promise<ReadResourceResult | null> {
+  for (const [uriTemplate, entry] of templateRegistry) {
+    const params = extractTemplateParams(uriTemplate, uri);
+    if (params) {
+      return entry.handler(params, context);
+    }
+  }
   return null;
 }

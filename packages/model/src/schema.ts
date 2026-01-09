@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { ClientMetadataSchema, ToolStrategyConfigSchema } from "./strategy.js";
+import { ClientMetadataSchema, ToolDelegationConfigSchema } from "./strategy.js";
 
 // =============================================================================
 // Server Identity
@@ -76,7 +76,7 @@ export const SessionConfigSchema = z
     clientMetadata: ClientMetadataSchema.optional().describe(
       "Discovered or provided client/LLM metadata"
     ),
-    toolStrategies: ToolStrategyConfigSchema.describe("Per-tool execution strategy overrides"),
+    toolDelegations: ToolDelegationConfigSchema.describe("Per-tool delegation configuration"),
     createdAt: z.string().datetime().describe("ISO 8601 timestamp of session creation"),
     updatedAt: z.string().datetime().describe("ISO 8601 timestamp of last update"),
   })

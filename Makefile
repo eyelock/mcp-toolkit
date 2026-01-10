@@ -1,4 +1,4 @@
-.PHONY: rebuild build test check lint format clean mcp mcp.stdio mcp.http cli worktree worktree.update worktree.delete help
+.PHONY: rebuild build test check lint format clean mcp mcp.stdio mcp.http cli docs worktree worktree.update worktree.delete help
 
 # Build & Development
 rebuild:
@@ -42,6 +42,10 @@ mcp.http:
 # CLI
 cli:
 	pnpm --filter @mcp-toolkit/cli run cli --help
+
+# Documentation
+docs:
+	pnpm run docs:serve
 
 # Worktree Management
 worktree:
@@ -107,4 +111,5 @@ help:
 	@echo "Quality:   check lint format"
 	@echo "MCP:       mcp mcp.stdio mcp.http"
 	@echo "CLI:       cli"
+	@echo "Docs:      docs"
 	@echo "Worktree:  worktree worktree.update worktree.delete"

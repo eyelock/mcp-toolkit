@@ -3,17 +3,18 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { HookRegistry, createHookRegistry } from "./registry.js";
+import { type HookRegistry, createHookRegistry } from "./registry.js";
 import type { HookDefinitionInput } from "./types.js";
 
 describe("HookRegistry", () => {
   let registry: HookRegistry;
 
   const createTestHook = (overrides: Partial<HookDefinitionInput> = {}): HookDefinitionInput => ({
-    id: "test:hook",
+    tag: "test-hook",
     type: "session",
     lifecycle: "start",
     name: "Test Hook",
+    requirementLevel: "SHOULD",
     ...overrides,
   });
 
@@ -22,39 +23,46 @@ describe("HookRegistry", () => {
   });
 
   describe("register", () => {
-    it("registers a valid hook", () => {
+    it("registers a valid hook with computed ID", () => {
       const hook = registry.register(createTestHook());
 
-      expect(hook.id).toBe("test:hook");
-      expect(hook.priority).toBe(100); // default
-      expect(registry.has("test:hook")).toBe(true);
+      expect(hook.id).toBe("mcp-toolkit:session:start:test-hook");
+      expect(hook.priority).toBe(50); // default
+      expect(registry.has("mcp-toolkit:session:start:test-hook")).toBe(true);
+    });
+
+    it("uses custom app prefix", () => {
+      const hook = registry.register(createTestHook({ app: "my-app" }));
+
+      expect(hook.id).toBe("my-app:session:start:test-hook");
+      expect(hook.app).toBe("my-app");
     });
 
     it("throws on duplicate registration", () => {
       registry.register(createTestHook());
 
       expect(() => registry.register(createTestHook())).toThrow(
-        "Hook with ID 'test:hook' is already registered"
+        "Hook with ID 'mcp-toolkit:session:start:test-hook' is already registered"
       );
     });
 
     it("validates hook definition", () => {
       expect(() =>
         registry.register({
-          id: "",
+          tag: "",
           type: "session",
           lifecycle: "start",
           name: "Test",
-        })
+          requirementLevel: "SHOULD",
+        } as HookDefinitionInput)
       ).toThrow();
     });
 
     it("applies defaults to registered hook", () => {
       const hook = registry.register(createTestHook());
 
-      expect(hook.priority).toBe(100);
-      expect(hook.dependencies).toEqual([]);
-      expect(hook.blocking).toBe(false);
+      expect(hook.app).toBe("mcp-toolkit");
+      expect(hook.priority).toBe(50);
       expect(hook.tags).toEqual([]);
     });
   });
@@ -62,9 +70,9 @@ describe("HookRegistry", () => {
   describe("registerAll", () => {
     it("registers multiple hooks", () => {
       const hooks = registry.registerAll([
-        createTestHook({ id: "hook:one" }),
-        createTestHook({ id: "hook:two" }),
-        createTestHook({ id: "hook:three" }),
+        createTestHook({ tag: "hook-one" }),
+        createTestHook({ tag: "hook-two" }),
+        createTestHook({ tag: "hook-three" }),
       ]);
 
       expect(hooks).toHaveLength(3);
@@ -72,12 +80,12 @@ describe("HookRegistry", () => {
     });
 
     it("throws if any hook is duplicate", () => {
-      registry.register(createTestHook({ id: "hook:one" }));
+      registry.register(createTestHook({ tag: "hook-one" }));
 
       expect(() =>
         registry.registerAll([
-          createTestHook({ id: "hook:two" }),
-          createTestHook({ id: "hook:one" }), // duplicate
+          createTestHook({ tag: "hook-two" }),
+          createTestHook({ tag: "hook-one" }), // duplicate
         ])
       ).toThrow();
     });
@@ -87,8 +95,8 @@ describe("HookRegistry", () => {
     it("returns registered hook by id", () => {
       registry.register(createTestHook());
 
-      const hook = registry.get("test:hook");
-      expect(hook?.id).toBe("test:hook");
+      const hook = registry.get("mcp-toolkit:session:start:test-hook");
+      expect(hook?.id).toBe("mcp-toolkit:session:start:test-hook");
     });
 
     it("returns undefined for non-existent hook", () => {
@@ -99,7 +107,7 @@ describe("HookRegistry", () => {
   describe("has", () => {
     it("returns true for registered hook", () => {
       registry.register(createTestHook());
-      expect(registry.has("test:hook")).toBe(true);
+      expect(registry.has("mcp-toolkit:session:start:test-hook")).toBe(true);
     });
 
     it("returns false for non-existent hook", () => {
@@ -110,10 +118,10 @@ describe("HookRegistry", () => {
   describe("unregister", () => {
     it("removes registered hook", () => {
       registry.register(createTestHook());
-      const removed = registry.unregister("test:hook");
+      const removed = registry.unregister("mcp-toolkit:session:start:test-hook");
 
       expect(removed).toBe(true);
-      expect(registry.has("test:hook")).toBe(false);
+      expect(registry.has("mcp-toolkit:session:start:test-hook")).toBe(false);
     });
 
     it("returns false for non-existent hook", () => {
@@ -124,194 +132,119 @@ describe("HookRegistry", () => {
   describe("query", () => {
     beforeEach(() => {
       registry.registerAll([
-        createTestHook({
-          id: "session:start:one",
-          type: "session",
-          lifecycle: "start",
-          priority: 10,
-          tags: ["core"],
-        }),
-        createTestHook({
-          id: "session:start:two",
-          type: "session",
-          lifecycle: "start",
-          priority: 20,
-          tags: ["optional"],
-        }),
-        createTestHook({
-          id: "session:end",
-          type: "session",
-          lifecycle: "end",
-          priority: 15,
-        }),
-        createTestHook({
-          id: "action:save",
-          type: "action",
-          lifecycle: "action",
-          priority: 5,
-          tags: ["core"],
-        }),
-        createTestHook({
-          id: "provider:git",
-          type: "provider",
-          lifecycle: "config",
-          priority: 50,
-          conditions: { requiresProvider: "git-notes" },
-        }),
+        createTestHook({ tag: "session-start", type: "session", lifecycle: "start" }),
+        createTestHook({ tag: "session-end", type: "session", lifecycle: "end" }),
+        createTestHook({ tag: "action-start", type: "action", lifecycle: "start" }),
+        createTestHook({ tag: "storage-mem", type: "storage", lifecycle: "start" }),
       ]);
     });
 
-    it("returns all hooks without conditions when no options provided", () => {
-      const results = registry.query();
-      // provider:git is excluded because its condition requires a provider
-      expect(results).toHaveLength(4);
+    it("returns all hooks with empty query", () => {
+      const hooks = registry.query({});
+      expect(hooks).toHaveLength(4);
     });
 
     it("filters by type", () => {
-      const results = registry.query({ type: "session" });
-
-      expect(results).toHaveLength(3);
-      expect(results.every((h) => h.type === "session")).toBe(true);
+      const hooks = registry.query({ type: "session" });
+      expect(hooks).toHaveLength(2);
+      expect(hooks.every((h) => h.type === "session")).toBe(true);
     });
 
     it("filters by lifecycle", () => {
-      const results = registry.query({ lifecycle: "start" });
-
-      expect(results).toHaveLength(2);
-      expect(results.every((h) => h.lifecycle === "start")).toBe(true);
+      const hooks = registry.query({ lifecycle: "start" });
+      expect(hooks).toHaveLength(3);
+      expect(hooks.every((h) => h.lifecycle === "start")).toBe(true);
     });
 
     it("filters by type and lifecycle", () => {
-      const results = registry.query({ type: "session", lifecycle: "start" });
-
-      expect(results).toHaveLength(2);
+      const hooks = registry.query({ type: "session", lifecycle: "start" });
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0]!.tag).toBe("session-start");
     });
 
-    it("filters by tags (any match)", () => {
-      const results = registry.query({ tags: ["core"] });
+    it("filters by tags", () => {
+      registry.register(createTestHook({ tag: "tagged-hook", tags: ["important", "test"] }));
 
-      expect(results).toHaveLength(2);
-      expect(results.some((h) => h.id === "session:start:one")).toBe(true);
-      expect(results.some((h) => h.id === "action:save")).toBe(true);
+      const hooks = registry.query({ tags: ["important"] });
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0]!.tags).toContain("important");
     });
 
-    it("filters by multiple tags (any match)", () => {
-      const results = registry.query({ tags: ["core", "optional"] });
+    it("sorts by priority (higher first)", () => {
+      registry.clear();
+      registry.registerAll([
+        createTestHook({ tag: "low", priority: 10 }),
+        createTestHook({ tag: "high", priority: 100 }),
+        createTestHook({ tag: "medium", priority: 50 }),
+      ]);
 
-      expect(results).toHaveLength(3);
-    });
-
-    it("sorts results by priority", () => {
-      // Query with git-notes provider to include all 5 hooks
-      const results = registry.query({ provider: "git-notes" });
-      const priorities = results.map((h) => h.priority);
-
-      expect(priorities).toEqual([5, 10, 15, 20, 50]);
-    });
-
-    it("excludes hooks with unmet provider condition", () => {
-      const results = registry.query({ provider: "memory" });
-
-      expect(results).toHaveLength(4);
-      expect(results.every((h) => h.id !== "provider:git")).toBe(true);
-    });
-
-    it("includes hooks with met provider condition", () => {
-      const results = registry.query({ provider: "git-notes" });
-
-      expect(results).toHaveLength(5);
-      expect(results.some((h) => h.id === "provider:git")).toBe(true);
+      const hooks = registry.query({});
+      expect(hooks.map((h) => h.tag)).toEqual(["high", "medium", "low"]);
     });
   });
 
-  describe("query with conditions", () => {
-    it("evaluates requiresFeature condition", () => {
+  describe("conditions", () => {
+    it("filters by requiresStorage", () => {
       registry.register(
         createTestHook({
-          id: "feature:hook",
-          conditions: { requiresFeature: "advanced" },
+          tag: "memory-hook",
+          conditions: { requiresStorage: ["memory"] },
         })
       );
 
-      expect(registry.query({ feature: "basic" })).toHaveLength(0);
-      expect(registry.query({ feature: "advanced" })).toHaveLength(1);
+      // Without storage context, hook is excluded
+      expect(registry.query({}).filter((h) => h.tag === "memory-hook")).toHaveLength(0);
+
+      // With matching storage, hook is included
+      const hooks = registry.query({ storage: "memory" });
+      expect(hooks.some((h) => h.tag === "memory-hook")).toBe(true);
     });
 
-    it("evaluates requiresConfig condition", () => {
+    it("filters by requiresFeatures", () => {
       registry.register(
         createTestHook({
-          id: "config:hook",
-          conditions: { requiresConfig: { debug: true, level: "verbose" } },
+          tag: "sampling-hook",
+          conditions: { requiresFeatures: ["sampling"] },
         })
       );
 
-      expect(registry.query({ config: { debug: false } })).toHaveLength(0);
-      expect(registry.query({ config: { debug: true } })).toHaveLength(0);
-      expect(registry.query({ config: { debug: true, level: "verbose" } })).toHaveLength(1);
-    });
+      // Without feature context, hook is excluded
+      expect(registry.query({}).filter((h) => h.tag === "sampling-hook")).toHaveLength(0);
 
-    it("includes hooks without conditions", () => {
-      registry.register(createTestHook({ id: "no-conditions" }));
-      registry.register(
-        createTestHook({
-          id: "with-conditions",
-          conditions: { requiresProvider: "special" },
-        })
-      );
-
-      const results = registry.query();
-      expect(results).toHaveLength(1);
-      expect(results[0]!.id).toBe("no-conditions");
+      // With matching feature, hook is included
+      const hooks = registry.query({ feature: "sampling" });
+      expect(hooks.some((h) => h.tag === "sampling-hook")).toBe(true);
     });
   });
 
   describe("all", () => {
     it("returns all registered hooks", () => {
-      registry.registerAll([
-        createTestHook({ id: "hook:one" }),
-        createTestHook({ id: "hook:two" }),
-      ]);
+      registry.registerAll([createTestHook({ tag: "hook-1" }), createTestHook({ tag: "hook-2" })]);
 
-      const all = registry.all();
-      expect(all).toHaveLength(2);
-    });
-
-    it("returns empty array when no hooks registered", () => {
-      expect(registry.all()).toEqual([]);
+      expect(registry.all()).toHaveLength(2);
     });
   });
 
   describe("size", () => {
-    it("returns correct count", () => {
+    it("returns count of registered hooks", () => {
       expect(registry.size()).toBe(0);
 
-      registry.register(createTestHook({ id: "one" }));
+      registry.register(createTestHook({ tag: "hook-1" }));
       expect(registry.size()).toBe(1);
 
-      registry.register(createTestHook({ id: "two" }));
+      registry.register(createTestHook({ tag: "hook-2" }));
       expect(registry.size()).toBe(2);
-
-      registry.unregister("one");
-      expect(registry.size()).toBe(1);
     });
   });
 
   describe("clear", () => {
     it("removes all hooks", () => {
-      registry.registerAll([createTestHook({ id: "one" }), createTestHook({ id: "two" })]);
+      registry.registerAll([createTestHook({ tag: "hook-1" }), createTestHook({ tag: "hook-2" })]);
 
       registry.clear();
 
       expect(registry.size()).toBe(0);
       expect(registry.all()).toEqual([]);
     });
-  });
-});
-
-describe("createHookRegistry", () => {
-  it("creates a new registry instance", () => {
-    const registry = createHookRegistry();
-    expect(registry).toBeInstanceOf(HookRegistry);
-    expect(registry.size()).toBe(0);
   });
 });

@@ -14,9 +14,9 @@ describe("@mcp-toolkit/core exports", () => {
     expect(core.HookLifecycleSchema).toBeDefined();
     expect(core.HookDefinitionSchema).toBeDefined();
     expect(core.HookDefinitionInputSchema).toBeDefined();
-    expect(core.ResolvedHookSchema).toBeDefined();
+    expect(core.RequirementLevelSchema).toBeDefined();
+    expect(core.McpFeatureSchema).toBeDefined();
     expect(core.HookQueryOptionsSchema).toBeDefined();
-    expect(core.ComposedHooksResultSchema).toBeDefined();
   });
 
   it("exports registry classes and factories", () => {
@@ -28,8 +28,6 @@ describe("@mcp-toolkit/core exports", () => {
   it("exports loader classes and utilities", () => {
     expect(core.HookContentLoader).toBeDefined();
     expect(core.createContentLoader).toBeDefined();
-    expect(core.getModuleDir).toBeDefined();
-    expect(typeof core.getModuleDir).toBe("function");
   });
 
   it("exports composer classes and utilities", () => {

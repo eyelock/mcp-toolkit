@@ -4,10 +4,11 @@
  * Tests that all exports are accessible and work together correctly.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   type ComposedHooksResult,
-  ComposedHooksResultSchema,
   type ComposerOptions,
   type ContentLoaderOptions,
   // Composer
@@ -27,13 +28,15 @@ import {
   type HookType,
   // Types
   HookTypeSchema,
+  type McpFeature,
+  McpFeatureSchema,
+  type RequirementLevel,
+  RequirementLevelSchema,
   type ResolvedHook,
-  ResolvedHookSchema,
   composeHooks,
   createComposer,
   createContentLoader,
   createHookRegistry,
-  getModuleDir,
 } from "./index.js";
 
 describe("Hook System Exports", () => {
@@ -41,11 +44,11 @@ describe("Hook System Exports", () => {
     it("exports all Zod schemas", () => {
       expect(HookTypeSchema).toBeDefined();
       expect(HookLifecycleSchema).toBeDefined();
+      expect(RequirementLevelSchema).toBeDefined();
+      expect(McpFeatureSchema).toBeDefined();
       expect(HookDefinitionSchema).toBeDefined();
       expect(HookDefinitionInputSchema).toBeDefined();
-      expect(ResolvedHookSchema).toBeDefined();
       expect(HookQueryOptionsSchema).toBeDefined();
-      expect(ComposedHooksResultSchema).toBeDefined();
     });
   });
 
@@ -66,19 +69,14 @@ describe("Hook System Exports", () => {
   describe("Loader", () => {
     it("exports HookContentLoader class", () => {
       expect(HookContentLoader).toBeDefined();
-      const loader = new HookContentLoader();
+      const loader = new HookContentLoader({ basePath: tmpdir() });
       expect(loader).toBeInstanceOf(HookContentLoader);
     });
 
     it("exports createContentLoader factory", () => {
       expect(createContentLoader).toBeDefined();
-      const loader = createContentLoader();
+      const loader = createContentLoader({ basePath: tmpdir() });
       expect(loader).toBeInstanceOf(HookContentLoader);
-    });
-
-    it("exports getModuleDir helper", () => {
-      expect(getModuleDir).toBeDefined();
-      expect(typeof getModuleDir).toBe("function");
     });
   });
 
@@ -109,27 +107,29 @@ describe("Integration: Full Hook Workflow", () => {
 
     registry.registerAll([
       {
-        id: "mcp-toolkit:session:start",
+        tag: "session-start",
         type: "session",
         lifecycle: "start",
         name: "Session Start",
-        priority: 10,
+        requirementLevel: "MUST",
+        priority: 100,
       },
       {
-        id: "mcp-toolkit:session:config",
+        tag: "session-running",
         type: "session",
-        lifecycle: "config",
-        name: "Configuration",
-        priority: 20,
-        dependencies: ["mcp-toolkit:session:start"],
+        lifecycle: "running",
+        name: "Session Running",
+        requirementLevel: "SHOULD",
+        priority: 50,
       },
       {
-        id: "provider:git:config",
-        type: "provider",
-        lifecycle: "config",
-        name: "Git Provider Config",
+        tag: "storage-memory",
+        type: "storage",
+        lifecycle: "start",
+        name: "Memory Storage",
+        requirementLevel: "MAY",
         priority: 30,
-        conditions: { requiresProvider: "git-notes" },
+        conditions: { requiresStorage: ["memory"] },
       },
     ]);
 
@@ -140,53 +140,51 @@ describe("Integration: Full Hook Workflow", () => {
     });
 
     expect(startHooks).toHaveLength(1);
-    expect(startHooks[0]!.id).toBe("mcp-toolkit:session:start");
+    expect(startHooks[0]!.id).toBe("mcp-toolkit:session:start:session-start");
 
-    // 3. Query config hooks for git provider
-    const configHooks = registry.query({
-      lifecycle: "config",
-      provider: "git-notes",
+    // 3. Query storage hooks with memory context
+    const storageHooks = registry.query({
+      type: "storage",
+      storage: "memory",
     });
 
-    expect(configHooks).toHaveLength(2);
+    expect(storageHooks).toHaveLength(1);
+    expect(storageHooks[0]!.tag).toBe("storage-memory");
 
     // 4. Load content (inline for testing)
-    const loader = createContentLoader();
+    const loader = createContentLoader({ basePath: tmpdir() });
 
-    const resolvedHooks: ResolvedHook[] = configHooks.map((hook) =>
+    const resolvedHooks: ResolvedHook[] = startHooks.map((hook) =>
       loader.loadInline(hook, `# ${hook.name}\n\nContent for ${hook.id}`)
     );
 
     // 5. Compose hooks
     const result = composeHooks(resolvedHooks);
 
-    expect(result.hooks).toHaveLength(2);
-    expect(result.content).toContain("# Configuration");
-    expect(result.content).toContain("# Git Provider Config");
-
-    // Verify dependency ordering
-    const configIndex = result.content.indexOf("Configuration");
-    const gitIndex = result.content.indexOf("Git Provider Config");
-    expect(configIndex).toBeLessThan(gitIndex);
+    expect(result.includedHooks).toHaveLength(1);
+    expect(result.content).toContain("### Session Start");
   });
 
   it("type inference works correctly", () => {
     // These should all compile without errors due to proper type exports
     const type: HookType = "session";
     const lifecycle: HookLifecycle = "start";
+    const level: RequirementLevel = "SHOULD";
+    const feature: McpFeature = "sampling";
 
     const input: HookDefinitionInput = {
-      id: "test",
+      tag: "test",
       type,
       lifecycle,
       name: "Test",
+      requirementLevel: level,
     };
 
     const definition: HookDefinition = {
       ...input,
-      priority: 100,
-      dependencies: [],
-      blocking: false,
+      id: "mcp-toolkit:session:start:test",
+      app: "mcp-toolkit",
+      priority: 50,
       tags: [],
     };
 
@@ -199,35 +197,39 @@ describe("Integration: Full Hook Workflow", () => {
     const query: HookQueryOptions = {
       type: "session",
       lifecycle: "start",
+      feature,
     };
 
     const composed: ComposedHooksResult = {
       content: "content",
-      hooks: [{ id: "test", name: "Test", priority: 100 }],
+      includedHooks: [{ id: "test", name: "Test", requirementLevel: "SHOULD" }],
+      skippedHooks: [],
+      failedHooks: [],
+      notices: [],
       composedAt: new Date().toISOString(),
-      blockingHooks: [],
     };
 
     // All variables should be defined
     expect(type).toBe("session");
     expect(lifecycle).toBe("start");
-    expect(input.id).toBe("test");
-    expect(definition.priority).toBe(100);
+    expect(level).toBe("SHOULD");
+    expect(feature).toBe("sampling");
+    expect(input.tag).toBe("test");
+    expect(definition.priority).toBe(50);
     expect(resolved.content).toBe("content");
     expect(query.type).toBe("session");
-    expect(composed.hooks).toHaveLength(1);
+    expect(composed.includedHooks).toHaveLength(1);
   });
 
   it("option interfaces work correctly", () => {
     const loaderOptions: ContentLoaderOptions = {
-      basePath: "/custom",
+      basePath: join(tmpdir(), "hooks"),
       cache: false,
     };
 
     const composerOptions: ComposerOptions = {
-      separator: "---",
-      includeHeaders: true,
-      headerFormat: "## {name}",
+      includeRfc2119Reference: false,
+      includePreambles: false,
     };
 
     const loader = createContentLoader(loaderOptions);

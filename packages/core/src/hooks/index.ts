@@ -15,18 +15,17 @@
  * // Create registry and register hooks
  * const registry = createHookRegistry();
  * registry.register({
- *   id: "session:start",
+ *   tag: "welcome",
  *   type: "session",
  *   lifecycle: "start",
- *   name: "Session Start",
+ *   name: "Welcome",
+ *   requirementLevel: "SHOULD",
  * });
  *
  * // Query and compose hooks
  * const hooks = registry.query({ type: "session", lifecycle: "start" });
- * const loader = createContentLoader();
- * const resolved = await loader.loadAll(
- *   hooks.map(h => ({ hook: h, definitionPath: "..." }))
- * );
+ * const loader = createContentLoader({ basePath: "./hooks" });
+ * const { resolved } = await loader.loadAll(hooks);
  * const result = composeHooks(resolved);
  * ```
  */
@@ -35,17 +34,20 @@
 export {
   HookTypeSchema,
   HookLifecycleSchema,
+  RequirementLevelSchema,
+  McpFeatureSchema,
   HookDefinitionSchema,
   HookDefinitionInputSchema,
-  ResolvedHookSchema,
   HookQueryOptionsSchema,
-  ComposedHooksResultSchema,
   type HookType,
   type HookLifecycle,
+  type RequirementLevel,
+  type McpFeature,
   type HookDefinition,
   type HookDefinitionInput,
   type ResolvedHook,
   type HookQueryOptions,
+  type HookSummary,
   type ComposedHooksResult,
 } from "./types.js";
 
@@ -56,7 +58,6 @@ export { HookRegistry, createHookRegistry } from "./registry.js";
 export {
   HookContentLoader,
   createContentLoader,
-  getModuleDir,
   type ContentLoaderOptions,
 } from "./loader.js";
 

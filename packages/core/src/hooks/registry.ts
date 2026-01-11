@@ -10,6 +10,7 @@ import {
   type HookDefinitionInput,
   HookDefinitionSchema,
   type HookQueryOptions,
+  type McpFeature,
 } from "./types.js";
 
 /**
@@ -84,13 +85,24 @@ export class HookRegistry {
       results = results.filter((h) => h.tags.some((tag) => options.tags!.includes(tag)));
     }
 
+    // Filter by sessionId
+    if (options.sessionId) {
+      results = results.filter((h) => !h.sessionId || h.sessionId === options.sessionId);
+    }
+
+    // Filter by requestId
+    if (options.requestId) {
+      results = results.filter((h) => !h.requestId || h.requestId === options.requestId);
+    }
+
     // Filter by conditions
     results = results.filter((h) =>
-      this.evaluateConditions(h, options.provider, options.feature, options.config)
+      this.evaluateConditions(h, options.storage, options.feature, options.config)
     );
 
-    // Sort by priority (lower = earlier)
-    results.sort((a, b) => a.priority - b.priority);
+    // Sort by priority (higher = earlier within same requirement level)
+    // We don't sort by requirement level here - that's the composer's job
+    results.sort((a, b) => b.priority - a.priority);
 
     return results;
   }
@@ -121,8 +133,8 @@ export class HookRegistry {
    */
   private evaluateConditions(
     hook: HookDefinition,
-    provider?: string,
-    feature?: string,
+    storage?: string,
+    feature?: McpFeature,
     config?: Record<string, unknown>
   ): boolean {
     const conditions = hook.conditions;
@@ -130,14 +142,19 @@ export class HookRegistry {
       return true;
     }
 
-    // Check provider requirement
-    if (conditions.requiresProvider && conditions.requiresProvider !== provider) {
-      return false;
+    // Check storage requirement (any of the listed storage backends)
+    if (conditions.requiresStorage && conditions.requiresStorage.length > 0) {
+      if (!storage || !conditions.requiresStorage.includes(storage)) {
+        return false;
+      }
     }
 
-    // Check feature requirement
-    if (conditions.requiresFeature && conditions.requiresFeature !== feature) {
-      return false;
+    // Check feature requirement (all of the listed features must be present)
+    // For now, we check if a single feature matches
+    if (conditions.requiresFeatures && conditions.requiresFeatures.length > 0) {
+      if (!feature || !conditions.requiresFeatures.includes(feature)) {
+        return false;
+      }
     }
 
     // Check config requirements

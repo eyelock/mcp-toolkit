@@ -3,6 +3,7 @@
  *
  * HTTP transport with Server-Sent Events for remote deployment.
  * Supports bearer token authentication.
+ * Integrates with the hooks system for session lifecycle events.
  */
 
 import {
@@ -12,11 +13,18 @@ import {
 } from "node:http";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { getSessionEndHooks, getSessionStartHooks, type ServerContext } from "../server.js";
 
 export interface HttpTransportConfig {
   port?: number;
   host?: string;
   authToken?: string;
+  /** Server context for hooks (optional for backwards compatibility) */
+  context?: ServerContext;
+  /** Callback when a session starts with hook content */
+  onSessionStart?: (content: string, sessionId: string) => void;
+  /** Callback when a session ends with hook content */
+  onSessionEnd?: (content: string, sessionId: string) => void;
 }
 
 /**
@@ -26,7 +34,14 @@ export async function createHttpTransport(
   server: Server,
   config: HttpTransportConfig = {}
 ): Promise<void> {
-  const { port = 3000, host = "localhost", authToken } = config;
+  const {
+    port = 3000,
+    host = "localhost",
+    authToken,
+    context,
+    onSessionStart,
+    onSessionEnd,
+  } = config;
 
   // Track active transports for cleanup
   const transports = new Map<string, SSEServerTransport>();
@@ -68,11 +83,29 @@ export async function createHttpTransport(
       const transport = new SSEServerTransport(`/message/${sessionId}`, res);
       transports.set(sessionId, transport);
 
-      res.on("close", () => {
+      // Fire session end hooks when connection closes
+      res.on("close", async () => {
         transports.delete(sessionId);
+        if (context) {
+          const { content } = await getSessionEndHooks(context);
+          if (onSessionEnd) {
+            onSessionEnd(content, sessionId);
+          }
+          console.error(`[mcp-toolkit] HTTP session ended: ${sessionId}`);
+        }
       });
 
       await server.connect(transport);
+
+      // Fire session start hooks after connection established
+      if (context) {
+        const { content } = await getSessionStartHooks(context);
+        if (onSessionStart) {
+          onSessionStart(content, sessionId);
+        }
+        console.error(`[mcp-toolkit] HTTP session started: ${sessionId}`);
+      }
+
       return;
     }
 

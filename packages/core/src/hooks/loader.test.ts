@@ -6,7 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { HookContentLoader, createContentLoader, getModuleDir } from "./loader.js";
+import { type HookContentLoader, createContentLoader } from "./loader.js";
 import type { HookDefinition } from "./types.js";
 
 describe("HookContentLoader", () => {
@@ -14,21 +14,22 @@ describe("HookContentLoader", () => {
   let testDir: string;
 
   const createTestHook = (overrides: Partial<HookDefinition> = {}): HookDefinition => ({
-    id: "test:hook",
+    id: "mcp-toolkit:session:start:test-hook",
+    app: "mcp-toolkit",
+    tag: "test-hook",
     type: "session",
     lifecycle: "start",
     name: "Test Hook",
-    priority: 100,
-    dependencies: [],
-    blocking: false,
+    requirementLevel: "SHOULD",
+    priority: 50,
     tags: [],
     ...overrides,
   });
 
   beforeEach(async () => {
-    loader = createContentLoader();
     testDir = join(tmpdir(), `hook-loader-test-${Date.now()}`);
     await mkdir(testDir, { recursive: true });
+    loader = createContentLoader({ basePath: testDir });
   });
 
   afterEach(async () => {
@@ -36,51 +37,33 @@ describe("HookContentLoader", () => {
   });
 
   describe("resolveContentPath", () => {
-    it("resolves to adjacent .md file by convention", () => {
-      const hook = createTestHook();
-      const definitionPath = "/path/to/hooks/session-start.ts";
+    it("resolves to tag.md in basePath by convention", () => {
+      const hook = createTestHook({ tag: "welcome" });
 
-      const contentPath = loader.resolveContentPath(hook, definitionPath);
+      const contentPath = loader.resolveContentPath(hook);
 
-      expect(contentPath).toBe("/path/to/hooks/session-start.md");
+      expect(contentPath).toBe(join(testDir, "welcome.md"));
     });
 
     it("uses explicit contentFile when provided", () => {
-      const hook = createTestHook({ contentFile: "content/start.md" });
-      const definitionPath = "/path/to/hooks/index.ts";
+      const hook = createTestHook({
+        tag: "welcome",
+        contentFile: "content/welcome.md",
+      });
 
-      const contentPath = loader.resolveContentPath(hook, definitionPath);
+      const contentPath = loader.resolveContentPath(hook);
 
-      expect(contentPath).toBe("/path/to/hooks/content/start.md");
-    });
-
-    it("respects basePath option for explicit contentFile", () => {
-      const loaderWithBase = createContentLoader({ basePath: "/custom/base" });
-      const hook = createTestHook({ contentFile: "session/start.md" });
-      const definitionPath = "/path/to/hooks/index.ts";
-
-      const contentPath = loaderWithBase.resolveContentPath(hook, definitionPath);
-
-      expect(contentPath).toBe("/custom/base/session/start.md");
-    });
-
-    it("handles various file extensions", () => {
-      const hook = createTestHook();
-
-      expect(loader.resolveContentPath(hook, "/path/file.ts")).toBe("/path/file.md");
-      expect(loader.resolveContentPath(hook, "/path/file.js")).toBe("/path/file.md");
-      expect(loader.resolveContentPath(hook, "/path/file.mts")).toBe("/path/file.md");
+      expect(contentPath).toBe(join(testDir, "content/welcome.md"));
     });
   });
 
   describe("load", () => {
     it("loads content from resolved path", async () => {
-      const contentPath = join(testDir, "hook.md");
-      const definitionPath = join(testDir, "hook.ts");
+      const contentPath = join(testDir, "test-hook.md");
       await writeFile(contentPath, "# Hook Content\n\nThis is the content.");
 
       const hook = createTestHook();
-      const resolved = await loader.load(hook, definitionPath);
+      const resolved = await loader.load(hook);
 
       expect(resolved.content).toBe("# Hook Content\n\nThis is the content.");
       expect(resolved.contentPath).toBe(contentPath);
@@ -88,173 +71,110 @@ describe("HookContentLoader", () => {
     });
 
     it("preserves all hook properties in resolved result", async () => {
-      const contentPath = join(testDir, "hook.md");
-      const definitionPath = join(testDir, "hook.ts");
+      const contentPath = join(testDir, "custom-hook.md");
       await writeFile(contentPath, "content");
 
       const hook = createTestHook({
-        id: "custom:hook",
-        priority: 50,
+        tag: "custom-hook",
+        priority: 100,
         tags: ["tag1", "tag2"],
       });
+      const resolved = await loader.load(hook);
 
-      const resolved = await loader.load(hook, definitionPath);
-
-      expect(resolved.id).toBe("custom:hook");
-      expect(resolved.priority).toBe(50);
+      expect(resolved.tag).toBe("custom-hook");
+      expect(resolved.priority).toBe(100);
       expect(resolved.tags).toEqual(["tag1", "tag2"]);
     });
 
-    it("throws for non-existent content file", async () => {
-      const hook = createTestHook();
-      const definitionPath = join(testDir, "non-existent.ts");
+    it("throws when content file does not exist", async () => {
+      const hook = createTestHook({ tag: "non-existent" });
 
-      await expect(loader.load(hook, definitionPath)).rejects.toThrow();
+      await expect(loader.load(hook)).rejects.toThrow();
     });
 
-    it("caches content by default", async () => {
-      const contentPath = join(testDir, "hook.md");
-      const definitionPath = join(testDir, "hook.ts");
+    it("caches loaded content by default", async () => {
+      const contentPath = join(testDir, "test-hook.md");
       await writeFile(contentPath, "original content");
 
       const hook = createTestHook();
 
       // First load
-      const first = await loader.load(hook, definitionPath);
+      const first = await loader.load(hook);
       expect(first.content).toBe("original content");
 
       // Modify file
       await writeFile(contentPath, "modified content");
 
-      // Second load should return cached content
-      const second = await loader.load(hook, definitionPath);
+      // Second load returns cached
+      const second = await loader.load(hook);
       expect(second.content).toBe("original content");
-    });
-
-    it("respects cache option when disabled", async () => {
-      const loaderNoCache = createContentLoader({ cache: false });
-      const contentPath = join(testDir, "hook.md");
-      const definitionPath = join(testDir, "hook.ts");
-      await writeFile(contentPath, "original content");
-
-      const hook = createTestHook();
-
-      // First load
-      const first = await loaderNoCache.load(hook, definitionPath);
-      expect(first.content).toBe("original content");
-
-      // Modify file
-      await writeFile(contentPath, "modified content");
-
-      // Second load should return new content
-      const second = await loaderNoCache.load(hook, definitionPath);
-      expect(second.content).toBe("modified content");
     });
   });
 
   describe("loadAll", () => {
-    it("loads multiple hooks in parallel", async () => {
-      await writeFile(join(testDir, "hook1.md"), "Content 1");
-      await writeFile(join(testDir, "hook2.md"), "Content 2");
-      await writeFile(join(testDir, "hook3.md"), "Content 3");
+    it("loads multiple hooks and tracks failures", async () => {
+      await writeFile(join(testDir, "success.md"), "Success content");
 
-      const hooks = [
-        { hook: createTestHook({ id: "hook:1" }), definitionPath: join(testDir, "hook1.ts") },
-        { hook: createTestHook({ id: "hook:2" }), definitionPath: join(testDir, "hook2.ts") },
-        { hook: createTestHook({ id: "hook:3" }), definitionPath: join(testDir, "hook3.ts") },
-      ];
+      const hooks = [createTestHook({ tag: "success" }), createTestHook({ tag: "missing" })];
 
-      const resolved = await loader.loadAll(hooks);
+      const { resolved, failed } = await loader.loadAll(hooks);
 
-      expect(resolved).toHaveLength(3);
-      expect(resolved[0]!.content).toBe("Content 1");
-      expect(resolved[1]!.content).toBe("Content 2");
-      expect(resolved[2]!.content).toBe("Content 3");
-    });
-
-    it("returns empty array for empty input", async () => {
-      const resolved = await loader.loadAll([]);
-      expect(resolved).toEqual([]);
+      expect(resolved).toHaveLength(1);
+      expect(resolved[0]!.tag).toBe("success");
+      expect(failed).toHaveLength(1);
+      expect(failed[0]!.hook.tag).toBe("missing");
+      expect(failed[0]!.error).toBeDefined();
     });
   });
 
   describe("loadInline", () => {
     it("creates resolved hook from inline content", () => {
       const hook = createTestHook();
-      const content = "# Inline Content\n\nThis was provided directly.";
+      const resolved = loader.loadInline(hook, "# Inline Content");
 
-      const resolved = loader.loadInline(hook, content);
-
-      expect(resolved.content).toBe(content);
+      expect(resolved.content).toBe("# Inline Content");
       expect(resolved.contentPath).toBeUndefined();
       expect(resolved.resolvedAt).toBeDefined();
-    });
-
-    it("preserves all hook properties", () => {
-      const hook = createTestHook({
-        id: "inline:hook",
-        blocking: true,
-      });
-
-      const resolved = loader.loadInline(hook, "content");
-
-      expect(resolved.id).toBe("inline:hook");
-      expect(resolved.blocking).toBe(true);
     });
   });
 
   describe("cache management", () => {
-    it("reports cache size", async () => {
-      await writeFile(join(testDir, "hook1.md"), "Content 1");
-      await writeFile(join(testDir, "hook2.md"), "Content 2");
+    it("clearCache clears all cached content", async () => {
+      const contentPath = join(testDir, "test-hook.md");
+      await writeFile(contentPath, "original content");
 
-      expect(loader.cacheSize()).toBe(0);
+      const hook = createTestHook();
 
-      await loader.load(createTestHook(), join(testDir, "hook1.ts"));
+      // Load and cache
+      await loader.load(hook);
       expect(loader.cacheSize()).toBe(1);
 
-      await loader.load(createTestHook(), join(testDir, "hook2.ts"));
-      expect(loader.cacheSize()).toBe(2);
-    });
-
-    it("clears cache", async () => {
-      await writeFile(join(testDir, "hook.md"), "Content");
-      await loader.load(createTestHook(), join(testDir, "hook.ts"));
-
-      expect(loader.cacheSize()).toBe(1);
-
+      // Clear cache
       loader.clearCache();
-
       expect(loader.cacheSize()).toBe(0);
+
+      // Modify file and reload
+      await writeFile(contentPath, "modified content");
+      const reloaded = await loader.load(hook);
+      expect(reloaded.content).toBe("modified content");
     });
-  });
-});
 
-describe("createContentLoader", () => {
-  it("creates loader with default options", () => {
-    const loader = createContentLoader();
-    expect(loader).toBeInstanceOf(HookContentLoader);
-  });
+    it("disables cache when cache option is false", async () => {
+      const loaderNoCache = createContentLoader({ basePath: testDir, cache: false });
+      const contentPath = join(testDir, "test-hook.md");
+      await writeFile(contentPath, "original content");
 
-  it("creates loader with custom options", () => {
-    const loader = createContentLoader({
-      basePath: "/custom",
-      cache: false,
+      const hook = createTestHook();
+
+      // First load
+      await loaderNoCache.load(hook);
+
+      // Modify file
+      await writeFile(contentPath, "modified content");
+
+      // Second load returns new content
+      const second = await loaderNoCache.load(hook);
+      expect(second.content).toBe("modified content");
     });
-    expect(loader).toBeInstanceOf(HookContentLoader);
-  });
-});
-
-describe("getModuleDir", () => {
-  it("extracts directory from import.meta.url", () => {
-    const url = "file:///path/to/module/index.ts";
-    const dir = getModuleDir(url);
-    expect(dir).toBe("/path/to/module");
-  });
-
-  it("handles nested paths", () => {
-    const url = "file:///deep/nested/path/to/hooks/session.ts";
-    const dir = getModuleDir(url);
-    expect(dir).toBe("/deep/nested/path/to/hooks");
   });
 });

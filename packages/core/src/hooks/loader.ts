@@ -2,12 +2,11 @@
  * Hook Content Loader
  *
  * Resolves and loads markdown content for hooks. Supports convention-based
- * adjacent .md file resolution or explicit contentFile paths.
+ * resolution from tag name or explicit contentFile paths.
  */
 
 import { readFile } from "node:fs/promises";
-import { basename, dirname, extname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { HookDefinition, ResolvedHook } from "./types.js";
 
 /**
@@ -15,10 +14,11 @@ import type { HookDefinition, ResolvedHook } from "./types.js";
  */
 export interface ContentLoaderOptions {
   /**
-   * Base directory for resolving relative content paths.
-   * If not provided, paths are resolved relative to the hook definition file.
+   * Base directory for resolving content files.
+   * Content is loaded from `${basePath}/${hook.tag}.md` unless
+   * the hook specifies an explicit contentFile.
    */
-  basePath?: string;
+  basePath: string;
 
   /**
    * Cache resolved content to avoid repeated file reads
@@ -31,9 +31,9 @@ export interface ContentLoaderOptions {
  */
 export class HookContentLoader {
   private cache: Map<string, string> = new Map();
-  private readonly options: ContentLoaderOptions;
+  private readonly options: Required<ContentLoaderOptions>;
 
-  constructor(options: ContentLoaderOptions = {}) {
+  constructor(options: ContentLoaderOptions) {
     this.options = {
       cache: true,
       ...options,
@@ -44,35 +44,27 @@ export class HookContentLoader {
    * Resolve the content path for a hook definition.
    *
    * If contentFile is provided, uses that path.
-   * Otherwise, looks for an adjacent .md file with the same basename.
-   *
-   * @param hook The hook definition
-   * @param definitionPath Path to the .ts file that defines the hook
+   * Otherwise, looks for a .md file matching the hook's tag in basePath.
    */
-  resolveContentPath(hook: HookDefinition, definitionPath: string): string {
+  resolveContentPath(hook: HookDefinition): string {
     if (hook.contentFile) {
-      // Explicit content file - resolve relative to definition or basePath
-      if (this.options.basePath) {
-        return join(this.options.basePath, hook.contentFile);
-      }
-      return join(dirname(definitionPath), hook.contentFile);
+      // Explicit content file - resolve relative to basePath
+      return join(this.options.basePath, hook.contentFile);
     }
 
-    // Convention: adjacent .md file with same basename
-    const dir = dirname(definitionPath);
-    const base = basename(definitionPath, extname(definitionPath));
-    return join(dir, `${base}.md`);
+    // Convention: basePath/${tag}.md
+    return join(this.options.basePath, `${hook.tag}.md`);
   }
 
   /**
    * Load content for a hook definition
    *
    * @param hook The hook definition
-   * @param definitionPath Path to the .ts file that defines the hook
    * @returns The resolved hook with content loaded
+   * @throws Error if content file cannot be read
    */
-  async load(hook: HookDefinition, definitionPath: string): Promise<ResolvedHook> {
-    const contentPath = this.resolveContentPath(hook, definitionPath);
+  async load(hook: HookDefinition): Promise<ResolvedHook> {
+    const contentPath = this.resolveContentPath(hook);
 
     // Check cache first
     if (this.options.cache && this.cache.has(contentPath)) {
@@ -101,12 +93,28 @@ export class HookContentLoader {
   }
 
   /**
-   * Load content for multiple hooks
+   * Load content for multiple hooks, returning successful loads and failures
    */
-  async loadAll(
-    hooks: Array<{ hook: HookDefinition; definitionPath: string }>
-  ): Promise<ResolvedHook[]> {
-    return Promise.all(hooks.map(({ hook, definitionPath }) => this.load(hook, definitionPath)));
+  async loadAll(hooks: HookDefinition[]): Promise<{
+    resolved: ResolvedHook[];
+    failed: Array<{ hook: HookDefinition; error: string }>;
+  }> {
+    const resolved: ResolvedHook[] = [];
+    const failed: Array<{ hook: HookDefinition; error: string }> = [];
+
+    for (const hook of hooks) {
+      try {
+        const result = await this.load(hook);
+        resolved.push(result);
+      } catch (error) {
+        failed.push({
+          hook,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { resolved, failed };
   }
 
   /**
@@ -138,14 +146,6 @@ export class HookContentLoader {
 /**
  * Create a new content loader instance
  */
-export function createContentLoader(options?: ContentLoaderOptions): HookContentLoader {
+export function createContentLoader(options: ContentLoaderOptions): HookContentLoader {
   return new HookContentLoader(options);
-}
-
-/**
- * Helper to get the directory of the current module
- * Use this when defining hooks to resolve content paths correctly
- */
-export function getModuleDir(importMetaUrl: string): string {
-  return dirname(fileURLToPath(importMetaUrl));
 }

@@ -30,7 +30,7 @@ When a session is initialized, MCP Toolkit can optionally discover metadata abou
 │ MCP Server  │ ───────────────▶  │  Host LLM   │
 │             │                   │             │
 │ "What model │                   │ "I am       │
-│  are you?"  │  ◀───────────────│  claude..." │
+│  are you?"  │  ◀─────────────── │  claude..." │
 └─────────────┘     response      └─────────────┘
         │
         ▼

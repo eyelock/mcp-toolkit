@@ -3,18 +3,19 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { HookComposer, composeHooks, createComposer } from "./composer.js";
+import { composeHooks, createComposer } from "./composer.js";
 import type { ResolvedHook } from "./types.js";
 
 describe("HookComposer", () => {
   const createResolvedHook = (overrides: Partial<ResolvedHook> = {}): ResolvedHook => ({
-    id: "test:hook",
+    id: "mcp-toolkit:session:start:test-hook",
+    app: "mcp-toolkit",
+    tag: "test-hook",
     type: "session",
     lifecycle: "start",
     name: "Test Hook",
-    priority: 100,
-    dependencies: [],
-    blocking: false,
+    requirementLevel: "SHOULD",
+    priority: 50,
     tags: [],
     content: "Test content",
     resolvedAt: new Date().toISOString(),
@@ -27,327 +28,213 @@ describe("HookComposer", () => {
       const result = composer.compose([]);
 
       expect(result.content).toBe("");
-      expect(result.hooks).toEqual([]);
-      expect(result.blockingHooks).toEqual([]);
+      expect(result.includedHooks).toEqual([]);
+      expect(result.skippedHooks).toEqual([]);
+      expect(result.failedHooks).toEqual([]);
+      expect(result.notices).toEqual([]);
       expect(result.composedAt).toBeDefined();
     });
 
-    it("composes single hook", () => {
+    it("groups hooks by requirement level", () => {
       const composer = createComposer();
-      const hook = createResolvedHook({
-        id: "single:hook",
-        name: "Single Hook",
-        content: "# Single Hook Content",
-      });
-
-      const result = composer.compose([hook]);
-
-      expect(result.content).toBe("# Single Hook Content");
-      expect(result.hooks).toHaveLength(1);
-      expect(result.hooks[0]!.id).toBe("single:hook");
-    });
-
-    it("joins multiple hooks with separator", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({ id: "hook:1", content: "Content 1", priority: 10 }),
-        createResolvedHook({ id: "hook:2", content: "Content 2", priority: 20 }),
-        createResolvedHook({ id: "hook:3", content: "Content 3", priority: 30 }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toBe("Content 1\n\nContent 2\n\nContent 3");
-      expect(result.hooks).toHaveLength(3);
-    });
-
-    it("respects custom separator", () => {
-      const composer = createComposer({ separator: "\n---\n" });
-      const hooks = [
-        createResolvedHook({ id: "hook:1", content: "Content 1", priority: 10 }),
-        createResolvedHook({ id: "hook:2", content: "Content 2", priority: 20 }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toBe("Content 1\n---\nContent 2");
-    });
-
-    it("sorts hooks by priority", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({ id: "low", content: "Low", priority: 100 }),
-        createResolvedHook({ id: "high", content: "High", priority: 10 }),
-        createResolvedHook({ id: "medium", content: "Medium", priority: 50 }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toBe("High\n\nMedium\n\nLow");
-      expect(result.hooks.map((h) => h.id)).toEqual(["high", "medium", "low"]);
-    });
-
-    it("identifies blocking hooks", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({ id: "normal", blocking: false, priority: 10 }),
-        createResolvedHook({ id: "blocker1", blocking: true, priority: 20 }),
-        createResolvedHook({ id: "blocker2", blocking: true, priority: 30 }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.blockingHooks).toEqual(["blocker1", "blocker2"]);
-    });
-
-    it("includes headers when enabled", () => {
-      const composer = createComposer({ includeHeaders: true });
       const hooks = [
         createResolvedHook({
-          id: "hook:1",
-          name: "First Hook",
-          content: "First content",
+          tag: "may-hook",
+          name: "May Hook",
+          requirementLevel: "MAY",
+          content: "May content",
+        }),
+        createResolvedHook({
+          tag: "must-hook",
+          name: "Must Hook",
+          requirementLevel: "MUST",
+          content: "Must content",
+        }),
+        createResolvedHook({
+          tag: "should-hook",
+          name: "Should Hook",
+          requirementLevel: "SHOULD",
+          content: "Should content",
+        }),
+      ];
+
+      const result = composer.compose(hooks);
+
+      // MUST should come first, then SHOULD, then MAY
+      expect(result.content).toMatch(
+        /## MUST[\s\S]*Must content[\s\S]*## SHOULD[\s\S]*Should content[\s\S]*## MAY[\s\S]*May content/
+      );
+    });
+
+    it("includes RFC 2119 reference by default", () => {
+      const composer = createComposer();
+      const hooks = [createResolvedHook()];
+
+      const result = composer.compose(hooks);
+
+      expect(result.content).toContain("RFC 2119");
+    });
+
+    it("excludes RFC 2119 reference when disabled", () => {
+      const composer = createComposer({ includeRfc2119Reference: false });
+      const hooks = [createResolvedHook()];
+
+      const result = composer.compose(hooks);
+
+      expect(result.content).not.toContain("RFC 2119");
+    });
+
+    it("includes section preambles by default", () => {
+      const composer = createComposer();
+      const hooks = [createResolvedHook({ requirementLevel: "MUST", content: "Must content" })];
+
+      const result = composer.compose(hooks);
+
+      expect(result.content).toContain("absolute requirements");
+    });
+
+    it("excludes section preambles when disabled", () => {
+      const composer = createComposer({ includePreambles: false });
+      const hooks = [createResolvedHook({ requirementLevel: "MUST", content: "Must content" })];
+
+      const result = composer.compose(hooks);
+
+      expect(result.content).not.toContain("absolute requirements");
+    });
+
+    it("sorts hooks by priority within requirement level (higher first)", () => {
+      const composer = createComposer({ includePreambles: false });
+      const hooks = [
+        createResolvedHook({
+          tag: "low",
+          name: "Low Priority",
+          requirementLevel: "SHOULD",
           priority: 10,
+          content: "Low content",
         }),
         createResolvedHook({
-          id: "hook:2",
-          name: "Second Hook",
-          content: "Second content",
-          priority: 20,
-        }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toContain("## First Hook");
-      expect(result.content).toContain("First content");
-      expect(result.content).toContain("## Second Hook");
-    });
-
-    it("uses custom header format", () => {
-      const composer = createComposer({
-        includeHeaders: true,
-        headerFormat: "<!-- {id} ({priority}) -->",
-      });
-      const hooks = [
-        createResolvedHook({
-          id: "custom:hook",
-          name: "Custom",
-          content: "Content",
-          priority: 42,
-        }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toContain("<!-- custom:hook (42) -->");
-    });
-  });
-
-  describe("dependency ordering", () => {
-    it("places dependencies before dependents", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "dependent",
-          content: "Dependent",
-          priority: 10,
-          dependencies: ["base"],
-        }),
-        createResolvedHook({
-          id: "base",
-          content: "Base",
-          priority: 20,
-        }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toBe("Base\n\nDependent");
-    });
-
-    it("handles chain of dependencies", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "level3",
-          content: "Level 3",
-          priority: 10,
-          dependencies: ["level2"],
-        }),
-        createResolvedHook({
-          id: "level1",
-          content: "Level 1",
-          priority: 30,
-        }),
-        createResolvedHook({
-          id: "level2",
-          content: "Level 2",
-          priority: 20,
-          dependencies: ["level1"],
-        }),
-      ];
-
-      const result = composer.compose(hooks);
-
-      expect(result.content).toBe("Level 1\n\nLevel 2\n\nLevel 3");
-    });
-
-    it("throws on circular dependencies", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "a",
-          content: "A",
-          dependencies: ["b"],
-        }),
-        createResolvedHook({
-          id: "b",
-          content: "B",
-          dependencies: ["a"],
-        }),
-      ];
-
-      expect(() => composer.compose(hooks)).toThrow("Circular dependency");
-    });
-
-    it("throws on self-dependency", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "self",
-          content: "Self",
-          dependencies: ["self"],
-        }),
-      ];
-
-      expect(() => composer.compose(hooks)).toThrow("Circular dependency");
-    });
-
-    it("silently ignores missing dependencies", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "hook",
-          content: "Content",
-          dependencies: ["non-existent"],
-        }),
-      ];
-
-      // Should not throw
-      const result = composer.compose(hooks);
-      expect(result.hooks).toHaveLength(1);
-    });
-
-    it("combines dependency and priority ordering", () => {
-      const composer = createComposer();
-      const hooks = [
-        createResolvedHook({
-          id: "high-priority-dep",
-          content: "High Dep",
-          priority: 5,
-          dependencies: ["base"],
-        }),
-        createResolvedHook({
-          id: "low-priority-nodep",
-          content: "Low NoDep",
+          tag: "high",
+          name: "High Priority",
+          requirementLevel: "SHOULD",
           priority: 100,
+          content: "High content",
         }),
         createResolvedHook({
-          id: "base",
-          content: "Base",
+          tag: "medium",
+          name: "Medium Priority",
+          requirementLevel: "SHOULD",
           priority: 50,
+          content: "Medium content",
         }),
       ];
 
       const result = composer.compose(hooks);
 
-      // base must come before high-priority-dep despite lower priority
-      const order = result.hooks.map((h) => h.id);
-      expect(order.indexOf("base")).toBeLessThan(order.indexOf("high-priority-dep"));
+      // High priority should come first within SHOULD section
+      const shouldSection = result.content.split("## SHOULD")[1];
+      expect(shouldSection!.indexOf("High Priority")).toBeLessThan(
+        shouldSection!.indexOf("Medium Priority")
+      );
+      expect(shouldSection!.indexOf("Medium Priority")).toBeLessThan(
+        shouldSection!.indexOf("Low Priority")
+      );
     });
-  });
 
-  describe("result metadata", () => {
-    it("includes hook summary in result", () => {
+    it("includes hook names as subsection headers", () => {
+      const composer = createComposer({ includePreambles: false });
+      const hooks = [
+        createResolvedHook({
+          name: "My Custom Hook",
+          requirementLevel: "SHOULD",
+          content: "Hook content",
+        }),
+      ];
+
+      const result = composer.compose(hooks);
+
+      expect(result.content).toContain("### My Custom Hook");
+    });
+
+    it("tracks included hooks in result", () => {
       const composer = createComposer();
       const hooks = [
         createResolvedHook({
-          id: "test:hook",
-          name: "Test Hook",
-          priority: 42,
+          tag: "hook-1",
+          name: "Hook One",
+          requirementLevel: "MUST",
+        }),
+        createResolvedHook({
+          tag: "hook-2",
+          name: "Hook Two",
+          requirementLevel: "SHOULD",
         }),
       ];
 
       const result = composer.compose(hooks);
 
-      expect(result.hooks[0]).toEqual({
-        id: "test:hook",
-        name: "Test Hook",
-        priority: 42,
-      });
+      expect(result.includedHooks).toHaveLength(2);
+      expect(result.includedHooks[0]!.name).toBe("Hook One");
+      expect(result.includedHooks[0]!.requirementLevel).toBe("MUST");
+      expect(result.includedHooks[1]!.name).toBe("Hook Two");
     });
+  });
 
-    it("includes valid timestamp", () => {
+  describe("composeWithTransparency", () => {
+    it("tracks skipped hooks with reasons", () => {
       const composer = createComposer();
-      const before = new Date().toISOString();
-      const result = composer.compose([]);
-      const after = new Date().toISOString();
+      const resolved = [createResolvedHook()];
+      const skipped = [
+        {
+          hook: {
+            id: "skipped:hook",
+            name: "Skipped Hook",
+            requirementLevel: "SHOULD" as const,
+            priority: 50,
+          },
+          reason: "requires storage: memory",
+        },
+      ];
 
-      expect(result.composedAt >= before).toBe(true);
-      expect(result.composedAt <= after).toBe(true);
+      const result = composer.composeWithTransparency(resolved, skipped, []);
+
+      expect(result.skippedHooks).toHaveLength(1);
+      expect(result.skippedHooks[0]!.skipReason).toBe("requires storage: memory");
+      expect(result.notices).toContain(
+        "1 hook(s) were skipped (conditions not met): Skipped Hook (requires storage: memory)"
+      );
+    });
+
+    it("tracks failed hooks with errors", () => {
+      const composer = createComposer();
+      const resolved = [createResolvedHook()];
+      const failed = [
+        {
+          hook: {
+            id: "failed:hook",
+            name: "Failed Hook",
+            requirementLevel: "SHOULD" as const,
+            priority: 50,
+          },
+          error: "File not found",
+        },
+      ];
+
+      const result = composer.composeWithTransparency(resolved, [], failed);
+
+      expect(result.failedHooks).toHaveLength(1);
+      expect(result.failedHooks[0]!.error).toBe("File not found");
+      expect(result.notices).toContain("1 hook(s) failed to load: Failed Hook (File not found)");
     });
   });
-});
 
-describe("createComposer", () => {
-  it("creates composer with default options", () => {
-    const composer = createComposer();
-    expect(composer).toBeInstanceOf(HookComposer);
-  });
+  describe("composeHooks convenience function", () => {
+    it("uses default options", () => {
+      const hooks = [createResolvedHook({ requirementLevel: "MUST", content: "Content" })];
 
-  it("creates composer with custom options", () => {
-    const composer = createComposer({
-      separator: "---",
-      includeHeaders: true,
-      headerFormat: "### {name}",
+      const result = composeHooks(hooks);
+
+      expect(result.content).toContain("RFC 2119");
+      expect(result.content).toContain("## MUST");
     });
-    expect(composer).toBeInstanceOf(HookComposer);
-  });
-});
-
-describe("composeHooks", () => {
-  it("composes hooks with default options", () => {
-    const hooks = [
-      {
-        id: "hook:1",
-        type: "session" as const,
-        lifecycle: "start" as const,
-        name: "Hook One",
-        priority: 10,
-        dependencies: [],
-        blocking: false,
-        tags: [],
-        content: "Content 1",
-        resolvedAt: new Date().toISOString(),
-      },
-      {
-        id: "hook:2",
-        type: "session" as const,
-        lifecycle: "start" as const,
-        name: "Hook Two",
-        priority: 20,
-        dependencies: [],
-        blocking: false,
-        tags: [],
-        content: "Content 2",
-        resolvedAt: new Date().toISOString(),
-      },
-    ];
-
-    const result = composeHooks(hooks);
-
-    expect(result.content).toBe("Content 1\n\nContent 2");
-    expect(result.hooks).toHaveLength(2);
   });
 });

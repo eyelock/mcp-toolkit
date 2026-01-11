@@ -2,9 +2,11 @@
  * Welcome Prompt
  *
  * Provides context-aware prompts for the MCP client.
+ * Integrates with the hooks system for core session guidance.
  */
 
 import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { getSessionStartContent } from "../hooks/index.js";
 import type { ServerContext } from "../server.js";
 
 /**
@@ -31,6 +33,9 @@ export async function getWelcomePrompt(
 ): Promise<GetPromptResult> {
   const includeExamples = args?.include_examples === "true";
   const session = await context.provider.getSession();
+
+  // Get core session guidance from hooks
+  const coreGuidance = await getSessionStartContent();
 
   let message = `# MCP Toolkit
 
@@ -103,6 +108,11 @@ session_update({ features: { sampling: true } })
 `;
   }
 
+  // Append core session guidance from hooks
+  message += `---
+
+${coreGuidance}`;
+
   return {
     messages: [
       {
@@ -130,6 +140,7 @@ export async function getSessionSetupPrompt(
   context: ServerContext
 ): Promise<GetPromptResult> {
   const hasSession = await context.provider.hasSession();
+  const coreGuidance = await getSessionStartContent();
 
   if (hasSession) {
     const session = await context.provider.getSession();
@@ -139,7 +150,11 @@ export async function getSessionSetupPrompt(
           role: "user",
           content: {
             type: "text",
-            text: `A session already exists for project "${session.data?.projectName}". Would you like to update it or clear it and start fresh?`,
+            text: `A session already exists for project "${session.data?.projectName}". Would you like to update it or clear it and start fresh?
+
+---
+
+${coreGuidance}`,
           },
         },
       ],
@@ -164,7 +179,11 @@ Please answer the following questions:
    - Prompts: Allow the server to provide prompt templates
    - Sampling: Allow the server to request LLM completions
 
-Once you provide the project name, I'll initialize the session for you.`,
+Once you provide the project name, I'll initialize the session for you.
+
+---
+
+${coreGuidance}`,
         },
       },
     ],

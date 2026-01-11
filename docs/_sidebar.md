@@ -1,4 +1,5 @@
 - [Home](/)
 - [MCP Reference](mcp-reference.md)
+- [Hooks System](hooks.md)
 - [Tool Delegation](tool-delegation.md)
 - [Privacy](privacy.md)

@@ -3,8 +3,14 @@
  *
  * Creates and configures the MCP server with tools, resources, and prompts.
  * Supports the tool delegation pattern.
+ *
+ * Session and Request Tracking:
+ * - Each server instance has a unique sessionId (generated at creation)
+ * - Each request can have a requestId (from MCP _meta or auto-generated)
+ * - Hooks are fired at session start/end and around tool execution
  */
 
+import { randomUUID } from "node:crypto";
 import type { ServerIdentity, ToolDelegationConfig } from "@mcp-toolkit/model";
 import type { SessionProvider } from "@mcp-toolkit/storage";
 import { createMemoryProvider } from "@mcp-toolkit/storage";
@@ -17,8 +23,10 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { loadCoreHooks } from "./hooks/index.js";
 import { handleGetPrompt, registerPrompts } from "./prompts/index.js";
 import { handleResourceRead, registerResources } from "./resources/index.js";
+import { type SessionStateTracker, createSessionStateTracker } from "./spec/session-state.js";
 import { handleToolCall, registerTools } from "./tools/index.js";
 
 /**
@@ -45,15 +53,31 @@ export interface ServerConfig {
   identity?: ServerIdentity;
   /** Default tool delegation configuration */
   defaultToolDelegations?: ToolDelegationConfig;
+  /** Optional session ID (auto-generated if not provided) */
+  sessionId?: string;
+  /** Tools that require session initialization before use */
+  requiresInitTools?: string[];
 }
 
-export function createServer(config: ServerConfig = {}): Server {
+/**
+ * Result of createServer - includes both the MCP Server and context
+ */
+export interface CreateServerResult {
+  /** The MCP SDK Server instance */
+  server: Server;
+  /** Server context with session tracking and hooks */
+  context: ServerContext;
+}
+
+export function createServer(config: ServerConfig = {}): CreateServerResult {
   const {
     name = "mcp-toolkit",
     version = "0.0.0",
     provider = createMemoryProvider(),
     identity = { canonicalName: name, tags: {} },
     defaultToolDelegations = {},
+    sessionId = randomUUID(),
+    requiresInitTools = [],
   } = config;
 
   // Merge user-provided delegations with defaults (user overrides take precedence)
@@ -61,6 +85,10 @@ export function createServer(config: ServerConfig = {}): Server {
     ...DEFAULT_TOOL_DELEGATIONS,
     ...defaultToolDelegations,
   };
+
+  // Create session state tracker for workflow enforcement
+  const sessionStateTracker = createSessionStateTracker("session_init", requiresInitTools);
+  sessionStateTracker.setSessionId(sessionId);
 
   const server = new Server(
     { name, version },
@@ -82,6 +110,10 @@ export function createServer(config: ServerConfig = {}): Server {
     name,
     version,
     defaultToolDelegations: mergedDelegations,
+    sessionId,
+    sessionStateTracker,
+    // Request ID tracking - updated per request
+    currentRequestId: null,
   };
 
   // Register tool handlers
@@ -90,7 +122,30 @@ export function createServer(config: ServerConfig = {}): Server {
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    return handleToolCall(request.params.name, request.params.arguments ?? {}, context);
+    // Extract or generate requestId for this call
+    const requestId = (request.params._meta?.progressToken as string | undefined) ?? randomUUID();
+    context.currentRequestId = requestId;
+
+    // Check if tool is allowed given current session state
+    const blockMessage = sessionStateTracker.checkToolAllowed(request.params.name, requestId);
+    if (blockMessage) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: blockMessage }],
+      };
+    }
+
+    // Execute the tool
+    const result = await handleToolCall(
+      request.params.name,
+      request.params.arguments ?? {},
+      context
+    );
+
+    // Record the tool call for state tracking
+    sessionStateTracker.recordToolCall(request.params.name, requestId);
+
+    return result;
   });
 
   // Register resource handlers
@@ -111,7 +166,7 @@ export function createServer(config: ServerConfig = {}): Server {
     return handleGetPrompt(request.params.name, request.params.arguments, context);
   });
 
-  return server;
+  return { server, context };
 }
 
 export type ServerContext = {
@@ -127,4 +182,41 @@ export type ServerContext = {
   version: string;
   /** Default tool delegation configuration */
   defaultToolDelegations?: ToolDelegationConfig;
+  /** Unique session ID for this server instance */
+  sessionId: string;
+  /** Session state tracker for workflow enforcement */
+  sessionStateTracker: SessionStateTracker;
+  /** Current request ID (updated per request) */
+  currentRequestId: string | null;
 };
+
+/**
+ * Get session start hooks content
+ *
+ * Call this when the session begins to get guidance for the LLM.
+ */
+export async function getSessionStartHooks(
+  context: ServerContext
+): Promise<{ content: string; sessionId: string; requestId: string | null }> {
+  const { content } = await loadCoreHooks("session", "start");
+  return {
+    content,
+    sessionId: context.sessionId,
+    requestId: context.currentRequestId,
+  };
+}
+
+/**
+ * Get session end hooks content
+ *
+ * Call this when the session ends to get cleanup guidance for the LLM.
+ */
+export async function getSessionEndHooks(
+  context: ServerContext
+): Promise<{ content: string; sessionId: string }> {
+  const { content } = await loadCoreHooks("session", "end");
+  return {
+    content,
+    sessionId: context.sessionId,
+  };
+}

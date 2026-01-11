@@ -119,7 +119,7 @@ pnpm test:coverage
 my-mcp-server/
 ├── packages/
 │   ├── model/           # Zod schemas (single source of truth)
-│   ├── provider/        # Storage provider interface + implementations
+│   ├── storage/         # Storage provider interface + implementations
 │   ├── mcp/             # MCP server with tools, resources, prompts
 │   ├── cli/             # CLI commands (OCLIF)
 │   └── shared/          # Shared configs (typescript, vitest)

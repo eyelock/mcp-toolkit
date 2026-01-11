@@ -91,6 +91,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@mcp-toolkit/core':
+        specifier: workspace:*
+        version: link:../core
       '@mcp-toolkit/model':
         specifier: workspace:*
         version: link:../model

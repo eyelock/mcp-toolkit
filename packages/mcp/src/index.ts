@@ -89,7 +89,7 @@ async function main(): Promise<void> {
   const options = parseTransportArgs(args);
   const tags = parseTags(args);
 
-  const server = createServer({
+  const { server, context } = createServer({
     name: CANONICAL_NAME,
     version: VERSION,
     identity: {
@@ -99,9 +99,12 @@ async function main(): Promise<void> {
   });
 
   if (options.mode === "http") {
-    await createHttpTransport(server, options.httpConfig);
+    await createHttpTransport(server, {
+      ...options.httpConfig,
+      context,
+    });
   } else {
-    await createStdioTransport(server);
+    await createStdioTransport(server, { context });
   }
 }
 
@@ -111,6 +114,12 @@ main().catch((error) => {
 });
 
 // Re-export for library usage
-export { createServer } from "./server.js";
-export type { ServerConfig, ServerContext } from "./server.js";
+export { createServer, getSessionStartHooks, getSessionEndHooks } from "./server.js";
+export type { ServerConfig, ServerContext, CreateServerResult } from "./server.js";
 export * from "./transport/index.js";
+
+// MCP Specification implementations
+export * from "./spec/index.js";
+
+// Hooks system
+export * from "./hooks/index.js";

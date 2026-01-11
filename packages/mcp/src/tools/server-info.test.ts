@@ -1,4 +1,4 @@
-import { createMemoryProvider } from "@mcp-toolkit/provider";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
 import { describe, expect, it } from "vitest";
 import type { ServerContext } from "../server.js";
 import { handleServerInfo, serverInfoTool } from "./server-info.js";

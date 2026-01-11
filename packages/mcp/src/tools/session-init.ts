@@ -9,18 +9,18 @@
  */
 
 import {
-  type SessionConfig,
   type ClientMetadata,
+  type SessionConfig,
   SessionFeaturesSchema,
   SessionInitInputSchema,
 } from "@mcp-toolkit/model";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { ServerContext } from "../server.js";
-import { executeWithDelegation, resolveToolDelegation } from "../strategy/index.js";
-import { discoverClientMetadata } from "../strategy/client-discovery.js";
 import { logDebug, logInfo } from "../logging.js";
+import type { ServerContext } from "../server.js";
+import { discoverClientMetadata } from "../strategy/client-discovery.js";
+import { executeWithDelegation, resolveToolDelegation } from "../strategy/index.js";
 
 /** Tool name for client discovery sub-task */
 const CLIENT_DISCOVERY_TOOL = "session_init:client_discovery";

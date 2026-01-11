@@ -2,25 +2,25 @@
  * Resource Templates Tests
  */
 
-import { describe, it, expect, vi } from "vitest";
-import {
-  LOG_ENTRIES_TEMPLATE,
-  FEATURE_CONFIG_TEMPLATE,
-  DELEGATION_CONFIG_TEMPLATE,
-  resourceTemplates,
-  registerResourceTemplates,
-  extractTemplateParams,
-  matchesTemplate,
-  readLogEntries,
-  readFeatureConfig,
-  readDelegationConfig,
-  handleTemplatedResourceRead,
-  registerTemplate,
-  getRegisteredTemplates,
-  initializeTemplateRegistry,
-  handleTemplatedResourceReadFromRegistry,
-} from "./templates.js";
+import { describe, expect, it, vi } from "vitest";
 import type { ServerContext } from "../server.js";
+import {
+  DELEGATION_CONFIG_TEMPLATE,
+  FEATURE_CONFIG_TEMPLATE,
+  LOG_ENTRIES_TEMPLATE,
+  extractTemplateParams,
+  getRegisteredTemplates,
+  handleTemplatedResourceRead,
+  handleTemplatedResourceReadFromRegistry,
+  initializeTemplateRegistry,
+  matchesTemplate,
+  readDelegationConfig,
+  readFeatureConfig,
+  readLogEntries,
+  registerResourceTemplates,
+  registerTemplate,
+  resourceTemplates,
+} from "./templates.js";
 
 describe("Resource Templates", () => {
   describe("Template definitions", () => {

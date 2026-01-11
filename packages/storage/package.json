@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-toolkit/provider",
+  "name": "@mcp-toolkit/storage",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",

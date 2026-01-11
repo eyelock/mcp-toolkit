@@ -6,34 +6,34 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  // Types
-  HookTypeSchema,
-  HookLifecycleSchema,
-  HookDefinitionSchema,
-  HookDefinitionInputSchema,
-  ResolvedHookSchema,
-  HookQueryOptionsSchema,
-  ComposedHooksResultSchema,
-  type HookType,
-  type HookLifecycle,
-  type HookDefinition,
-  type HookDefinitionInput,
-  type ResolvedHook,
-  type HookQueryOptions,
   type ComposedHooksResult,
-  // Registry
-  HookRegistry,
-  createHookRegistry,
-  // Loader
-  HookContentLoader,
-  createContentLoader,
-  getModuleDir,
+  ComposedHooksResultSchema,
+  type ComposerOptions,
   type ContentLoaderOptions,
   // Composer
   HookComposer,
-  createComposer,
+  // Loader
+  HookContentLoader,
+  type HookDefinition,
+  type HookDefinitionInput,
+  HookDefinitionInputSchema,
+  HookDefinitionSchema,
+  type HookLifecycle,
+  HookLifecycleSchema,
+  type HookQueryOptions,
+  HookQueryOptionsSchema,
+  // Registry
+  HookRegistry,
+  type HookType,
+  // Types
+  HookTypeSchema,
+  type ResolvedHook,
+  ResolvedHookSchema,
   composeHooks,
-  type ComposerOptions,
+  createComposer,
+  createContentLoader,
+  createHookRegistry,
+  getModuleDir,
 } from "./index.js";
 
 describe("Hook System Exports", () => {

@@ -6,7 +6,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { dirname, join, basename, extname } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HookDefinition, ResolvedHook } from "./types.js";
 

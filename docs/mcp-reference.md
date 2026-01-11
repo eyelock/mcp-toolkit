@@ -504,12 +504,12 @@ const jsonSchema = zodToJsonSchema(SessionInitInputSchema);
 
 ## Provider Package
 
-**Implementation**: `packages/provider/src/`
+**Implementation**: `packages/storage/src/`
 
 Session persistence abstraction.
 
 ```typescript
-import { createMemoryProvider } from "@mcp-toolkit/provider";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
 
 const provider = createMemoryProvider();
 

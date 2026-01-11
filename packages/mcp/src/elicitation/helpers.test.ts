@@ -2,18 +2,18 @@
  * Elicitation Helpers Tests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
-  getElicitationTimeout,
   DEFAULT_ELICITATION_TIMEOUT_MS,
-  clientSupportsElicitation,
-  elicitInput,
-  elicitConfirmation,
-  elicitText,
-  elicitChoice,
   ElicitationNotSupportedError,
+  clientSupportsElicitation,
+  elicitChoice,
+  elicitConfirmation,
+  elicitInput,
+  elicitText,
+  getElicitationTimeout,
 } from "./helpers.js";
 
 /**

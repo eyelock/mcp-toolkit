@@ -1,5 +1,5 @@
 /**
- * @mcp-toolkit/provider
+ * @mcp-toolkit/storage
  *
  * Pluggable storage backends for MCP Toolkit.
  * Includes a reference in-memory implementation.

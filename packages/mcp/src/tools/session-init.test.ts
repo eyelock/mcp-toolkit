@@ -1,5 +1,5 @@
-import { createMemoryProvider } from "@mcp-toolkit/provider";
-import type { SessionProvider } from "@mcp-toolkit/provider";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
+import type { SessionProvider } from "@mcp-toolkit/storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerContext } from "../server.js";
 import {

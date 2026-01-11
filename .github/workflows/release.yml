@@ -139,7 +139,7 @@ jobs:
 
           # Get the changelog entry for this version from any package that has one
           NOTES=""
-          for pkg in packages/mcp packages/cli packages/model packages/provider; do
+          for pkg in packages/mcp packages/cli packages/model packages/storage; do
             if [ -f "$pkg/CHANGELOG.md" ]; then
               # Extract the section for this version
               SECTION=$(awk "/^## ${VERSION}$/,/^## [0-9]/" "$pkg/CHANGELOG.md" | head -n -1)

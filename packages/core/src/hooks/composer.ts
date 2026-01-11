@@ -5,7 +5,7 @@
  * priority ordering and dependency relationships.
  */
 
-import type { ResolvedHook, ComposedHooksResult } from "./types.js";
+import type { ComposedHooksResult, ResolvedHook } from "./types.js";
 
 /**
  * Options for composing hooks

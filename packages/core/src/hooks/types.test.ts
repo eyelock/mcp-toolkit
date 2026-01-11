@@ -6,13 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  HookTypeSchema,
-  HookLifecycleSchema,
-  HookDefinitionSchema,
-  HookDefinitionInputSchema,
-  ResolvedHookSchema,
-  HookQueryOptionsSchema,
   ComposedHooksResultSchema,
+  HookDefinitionInputSchema,
+  HookDefinitionSchema,
+  HookLifecycleSchema,
+  HookQueryOptionsSchema,
+  HookTypeSchema,
+  ResolvedHookSchema,
 } from "./types.js";
 
 describe("HookTypeSchema", () => {

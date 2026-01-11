@@ -5,7 +5,7 @@
  * Demonstrates CLI/MCP parity pattern.
  */
 
-import { createMemoryProvider } from "@mcp-toolkit/provider";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
 import { Command, Flags } from "@oclif/core";
 
 export default class Status extends Command {

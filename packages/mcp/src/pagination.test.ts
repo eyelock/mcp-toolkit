@@ -2,14 +2,14 @@
  * Pagination Tests
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  encodeCursor,
-  decodeCursor,
-  paginateResults,
-  createPaginatedResponse,
-  InvalidCursorError,
   DEFAULT_PAGE_SIZE,
+  InvalidCursorError,
+  createPaginatedResponse,
+  decodeCursor,
+  encodeCursor,
+  paginateResults,
 } from "./pagination.js";
 
 describe("Pagination", () => {

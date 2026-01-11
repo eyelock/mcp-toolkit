@@ -132,7 +132,7 @@ mcp-toolkit/
 │   │           ├── init.ts         # CLI mirror of session-init
 │   │           └── status.ts       # Show session status
 │   │
-│   ├── provider/                   # @mcp-toolkit/provider
+│   ├── storage/                    # @mcp-toolkit/storage
 │   │   ├── package.json
 │   │   └── src/
 │   │       ├── index.ts
@@ -264,7 +264,7 @@ echo "  yarn dev"
 | 1.1 | Initialize monorepo (package.json, turbo.json, yarn workspaces) |
 | 1.2 | Create shared configs (eslint, typescript, vitest, esbuild) |
 | 1.3 | Create `@mcp-toolkit/model` with session schema |
-| 1.4 | Create `@mcp-toolkit/provider` with memory implementation |
+| 1.4 | Create `@mcp-toolkit/storage` with memory implementation |
 | 1.5 | Basic CI workflow (build, lint, test) |
 
 ### Phase 2: MCP Server

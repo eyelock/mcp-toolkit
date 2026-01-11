@@ -21,7 +21,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ServerContext } from "../server.js";
 import { SESSION_RESOURCE_URI, readSessionResource, sessionResource } from "./session.js";
-import { registerResourceTemplates, handleTemplatedResourceRead } from "./templates.js";
+import { handleTemplatedResourceRead, registerResourceTemplates } from "./templates.js";
 
 // Re-export templates module
 export * from "./templates.js";

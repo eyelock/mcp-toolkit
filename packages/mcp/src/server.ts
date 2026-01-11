@@ -6,8 +6,8 @@
  */
 
 import type { ServerIdentity, ToolDelegationConfig } from "@mcp-toolkit/model";
-import type { SessionProvider } from "@mcp-toolkit/provider";
-import { createMemoryProvider } from "@mcp-toolkit/provider";
+import type { SessionProvider } from "@mcp-toolkit/storage";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,

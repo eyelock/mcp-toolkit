@@ -2,20 +2,20 @@
  * Tool Delegation Tests
  */
 
-import { describe, expect, it } from "vitest";
+import type { ToolDelegationConfig } from "@mcp-toolkit/model";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { describe, expect, it } from "vitest";
 import {
-  resolveToolDelegation,
+  DEFAULT_DELEGATION_TIMEOUT_MS,
   classifyTool,
   classifyToolByName,
-  getToolsByClassification,
-  toolRequiresSampling,
-  toolBenefitsFromSampling,
-  DEFAULT_DELEGATION_TIMEOUT_MS,
   clientSupportsSampling,
   extractTextFromSamplingResponse,
+  getToolsByClassification,
+  resolveToolDelegation,
+  toolBenefitsFromSampling,
+  toolRequiresSampling,
 } from "./index.js";
-import type { ToolDelegationConfig } from "@mcp-toolkit/model";
 
 describe("Tool Delegation", () => {
   describe("resolveToolDelegation", () => {

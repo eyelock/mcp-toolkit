@@ -215,7 +215,7 @@ export type MyData = z.infer<typeof MyDataSchema>;
 
 ### 2. Implement Your Provider
 
-Create `packages/provider/src/my-provider.ts`:
+Create `packages/storage/src/my-provider.ts`:
 
 ```typescript
 import type { SessionProvider } from "./interface.js";

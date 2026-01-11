@@ -10,15 +10,15 @@
  * choice when the tool knows the host LLM can do it better.
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
 import type {
   DelegationMode,
-  ExecutionOutcome,
   DelegationResult,
+  ExecutionOutcome,
   ToolDelegationConfig,
   ToolDelegationEntry,
 } from "@mcp-toolkit/model";
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
 import { logDebug, logWarning } from "../logging.js";
 
 // =============================================================================

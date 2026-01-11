@@ -11,9 +11,9 @@ import {
   type SessionConfig,
   SessionConfigSchema,
   SessionFeaturesSchema,
-  ToolDelegationConfigSchema,
   type SessionInitInput,
   type SessionUpdateInput,
+  ToolDelegationConfigSchema,
 } from "@mcp-toolkit/model";
 import type { ProviderResult, SessionProvider } from "./interface.js";
 

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { HookComposer, createComposer, composeHooks } from "./composer.js";
+import { HookComposer, composeHooks, createComposer } from "./composer.js";
 import type { ResolvedHook } from "./types.js";
 
 describe("HookComposer", () => {

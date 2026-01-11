@@ -3,9 +3,9 @@
  */
 
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { beforeEach, afterEach, describe, expect, it } from "vitest";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HookContentLoader, createContentLoader, getModuleDir } from "./loader.js";
 import type { HookDefinition } from "./types.js";
 

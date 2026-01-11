@@ -10,7 +10,7 @@
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
-import { logDebug, logWarning, logError } from "../logging.js";
+import { logDebug, logError, logWarning } from "../logging.js";
 
 /**
  * Default timeout for elicitation requests (5 minutes).

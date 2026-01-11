@@ -20,7 +20,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY packages/shared ./packages/shared
 COPY packages/model ./packages/model
-COPY packages/provider ./packages/provider
+COPY packages/storage ./packages/storage
 COPY packages/mcp ./packages/mcp
 
 # Install and build

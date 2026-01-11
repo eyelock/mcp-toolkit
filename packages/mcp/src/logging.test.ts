@@ -2,22 +2,22 @@
  * Logging Tests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  LogDataSchema,
+  LogLevel,
+  LogMessageSchema,
   Logger,
   StderrTransport,
-  LogLevel,
-  getLogger,
   configureLogger,
+  getLogger,
   logDebug,
-  logInfo,
-  logWarning,
   logError,
-  logToolRequest,
+  logInfo,
   logResourceAccess,
   logServerEvent,
-  LogDataSchema,
-  LogMessageSchema,
+  logToolRequest,
+  logWarning,
 } from "./logging.js";
 
 describe("Logging", () => {

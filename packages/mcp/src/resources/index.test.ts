@@ -1,7 +1,7 @@
-import { createMemoryProvider } from "@mcp-toolkit/provider";
+import { createMemoryProvider } from "@mcp-toolkit/storage";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ServerContext } from "../server.js";
-import { handleResourceRead, registerResources, getResourceTemplates } from "./index.js";
+import { getResourceTemplates, handleResourceRead, registerResources } from "./index.js";
 import { SESSION_RESOURCE_URI } from "./session.js";
 
 describe("Resources Registry", () => {

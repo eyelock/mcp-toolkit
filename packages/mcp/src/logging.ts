@@ -8,8 +8,8 @@
  * @see https://datatracker.ietf.org/doc/html/rfc5424
  */
 
-import { z } from "zod";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { z } from "zod";
 
 /**
  * RFC 5424 log levels per MCP specification

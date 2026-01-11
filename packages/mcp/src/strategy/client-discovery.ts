@@ -5,10 +5,10 @@
  * This is a perfect use case for delegation - only the LLM knows what model it is.
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { ClientMetadata } from "@mcp-toolkit/model";
 import { ClientMetadataSchema } from "@mcp-toolkit/model";
-import { logDebug, logWarning, logInfo } from "../logging.js";
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { logDebug, logInfo, logWarning } from "../logging.js";
 import { clientSupportsSampling, extractTextFromSamplingResponse } from "./index.js";
 
 // =============================================================================

@@ -1,4 +1,4 @@
-# @mcp-toolkit/provider
+# @mcp-toolkit/storage
 
 ## 0.1.0
 

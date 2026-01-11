@@ -1,9 +1,9 @@
-import * as providerModule from "@mcp-toolkit/provider";
+import * as providerModule from "@mcp-toolkit/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Init from "./init.js";
 
 // Mock the provider module
-vi.mock("@mcp-toolkit/provider", async (importOriginal) => {
+vi.mock("@mcp-toolkit/storage", async (importOriginal) => {
   const original = await importOriginal<typeof providerModule>();
   return {
     ...original,

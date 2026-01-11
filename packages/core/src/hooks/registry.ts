@@ -6,9 +6,9 @@
  */
 
 import {
-  HookDefinitionSchema,
   type HookDefinition,
   type HookDefinitionInput,
+  HookDefinitionSchema,
   type HookQueryOptions,
 } from "./types.js";
 

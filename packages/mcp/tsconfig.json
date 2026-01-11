@@ -8,6 +8,6 @@
   "exclude": ["node_modules", "dist", "**/*.test.ts"],
   "references": [
     { "path": "../model" },
-    { "path": "../provider" }
+    { "path": "../storage" }
   ]
 }

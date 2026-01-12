@@ -20,11 +20,7 @@ export * from "./setup-guide.js";
 /**
  * All toolkit prompts
  */
-export const toolkitPrompts: Prompt[] = [
-  designStartPrompt,
-  designEntityPrompt,
-  setupGuidePrompt,
-];
+export const toolkitPrompts: Prompt[] = [designStartPrompt, designEntityPrompt, setupGuidePrompt];
 
 /**
  * Prompt name to handler mapping

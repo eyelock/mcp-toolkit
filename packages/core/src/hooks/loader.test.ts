@@ -5,7 +5,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type HookContentLoader, createContentLoader } from "./loader.js";
 import type { HookDefinition } from "./types.js";
 
@@ -124,6 +124,19 @@ describe("HookContentLoader", () => {
       expect(failed).toHaveLength(1);
       expect(failed[0]!.hook.tag).toBe("missing");
       expect(failed[0]!.error).toBeDefined();
+    });
+
+    it("handles non-Error thrown values", async () => {
+      const hook = createTestHook({ tag: "throw-string" });
+
+      // Mock load to throw a non-Error value
+      vi.spyOn(loader, "load").mockRejectedValueOnce("string error thrown");
+
+      const { resolved, failed } = await loader.loadAll([hook]);
+
+      expect(resolved).toHaveLength(0);
+      expect(failed).toHaveLength(1);
+      expect(failed[0]!.error).toBe("string error thrown");
     });
   });
 

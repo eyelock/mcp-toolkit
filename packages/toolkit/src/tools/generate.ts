@@ -532,10 +532,7 @@ function mapTypeToTS(type: string): string {
 /**
  * Handle generate tool call
  */
-export async function handleGenerate(
-  args: unknown,
-  _context: unknown
-): Promise<CallToolResult> {
+export async function handleGenerate(args: unknown, _context: unknown): Promise<CallToolResult> {
   // Validate input
   const parseResult = GenerateInputSchema.safeParse(args);
   if (!parseResult.success) {
@@ -614,7 +611,10 @@ export async function handleGenerate(
   // Dry run - just show what would be generated
   if (input.dryRun) {
     const preview = files
-      .map((f) => `**${f.path}** - ${f.description}\n\`\`\`typescript\n${f.content.slice(0, 500)}${f.content.length > 500 ? "\n// ... (truncated)" : ""}\n\`\`\``)
+      .map(
+        (f) =>
+          `**${f.path}** - ${f.description}\n\`\`\`typescript\n${f.content.slice(0, 500)}${f.content.length > 500 ? "\n// ... (truncated)" : ""}\n\`\`\``
+      )
       .join("\n\n");
 
     return {

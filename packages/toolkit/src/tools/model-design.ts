@@ -79,10 +79,7 @@ function formatModel(model: DomainModel): string {
 /**
  * Handle model design tool call
  */
-export async function handleModelDesign(
-  args: unknown,
-  _context: unknown
-): Promise<CallToolResult> {
+export async function handleModelDesign(args: unknown, _context: unknown): Promise<CallToolResult> {
   // Validate input
   const parseResult = ModelDesignInputSchema.safeParse(args);
   if (!parseResult.success) {
@@ -216,11 +213,9 @@ export async function handleModelDesign(
         content: [
           {
             type: "text",
-            text: [
-              `Updated entity: **${input.entity.name}**`,
-              "",
-              formatEntity(input.entity),
-            ].join("\n"),
+            text: [`Updated entity: **${input.entity.name}**`, "", formatEntity(input.entity)].join(
+              "\n"
+            ),
           },
         ],
       };

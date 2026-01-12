@@ -16,6 +16,9 @@ import {
   planHook,
   buildHook,
   reviewHook,
+  getToolkitHandlers,
+  registerToolkit,
+  getToolkitComponents,
 } from "./index.js";
 import { HookRegistry } from "@mcp-toolkit/core";
 import { createWorkflowStateTracker, type WorkflowStateTracker } from "@mcp-toolkit/mcp";
@@ -98,6 +101,12 @@ describe("@mcp-toolkit/toolkit", () => {
       expect(result.allowed).toBe(false);
       expect(result.blockedBy).toBe(CONFIG_HOOK_ID);
     });
+
+    it("should register blocking hooks without tracker using default", () => {
+      // Call without tracker - uses default registerBlockingHook
+      registerToolkitBlocking();
+      // No assertion needed - just verifying the code path runs without error
+    });
   });
 
   describe("isToolkitConfigured / markToolkitConfigured", () => {
@@ -175,6 +184,70 @@ describe("@mcp-toolkit/toolkit", () => {
       expect(result.content).toContain("## SHOULD");
       // Should have MAY section (build)
       expect(result.content).toContain("## MAY");
+    });
+  });
+
+  describe("getToolkitHandlers", () => {
+    it("should return all handler functions", () => {
+      const handlers = getToolkitHandlers();
+
+      expect(handlers.isToolkitTool).toBeDefined();
+      expect(typeof handlers.isToolkitTool).toBe("function");
+      expect(handlers.handleToolCall).toBeDefined();
+      expect(typeof handlers.handleToolCall).toBe("function");
+      expect(handlers.isToolkitResource).toBeDefined();
+      expect(typeof handlers.isToolkitResource).toBe("function");
+      expect(handlers.handleResourceRead).toBeDefined();
+      expect(typeof handlers.handleResourceRead).toBe("function");
+      expect(handlers.isToolkitPrompt).toBeDefined();
+      expect(typeof handlers.isToolkitPrompt).toBe("function");
+      expect(handlers.handlePrompt).toBeDefined();
+      expect(typeof handlers.handlePrompt).toBe("function");
+    });
+
+    it("should have working isToolkitTool handler", () => {
+      const handlers = getToolkitHandlers();
+      expect(handlers.isToolkitTool("toolkit:model:design")).toBe(true);
+      expect(handlers.isToolkitTool("other:tool")).toBe(false);
+    });
+
+    it("should have working isToolkitResource handler", () => {
+      const handlers = getToolkitHandlers();
+      expect(handlers.isToolkitResource("toolkit://model")).toBe(true);
+      expect(handlers.isToolkitResource("other://resource")).toBe(false);
+    });
+
+    it("should have working isToolkitPrompt handler", () => {
+      const handlers = getToolkitHandlers();
+      expect(handlers.isToolkitPrompt("toolkit-design-start")).toBe(true);
+      expect(handlers.isToolkitPrompt("other-prompt")).toBe(false);
+    });
+  });
+
+  describe("registerToolkit", () => {
+    it("should return components and handlers", () => {
+      const result = registerToolkit();
+
+      expect(result.components).toBeDefined();
+      expect(result.handlers).toBeDefined();
+    });
+
+    it("should have matching components from getToolkitComponents", () => {
+      const result = registerToolkit();
+      const components = getToolkitComponents();
+
+      expect(result.components.tools).toEqual(components.tools);
+      expect(result.components.resources).toEqual(components.resources);
+      expect(result.components.prompts).toEqual(components.prompts);
+    });
+
+    it("should have matching handlers from getToolkitHandlers", () => {
+      const result = registerToolkit();
+      const handlers = getToolkitHandlers();
+
+      // Check that the functions are the same
+      expect(result.handlers.isToolkitTool.toString()).toBe(handlers.isToolkitTool.toString());
+      expect(result.handlers.handleToolCall.toString()).toBe(handlers.handleToolCall.toString());
     });
   });
 });

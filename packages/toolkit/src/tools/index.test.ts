@@ -53,11 +53,7 @@ describe("handleToolkitToolCall", () => {
   });
 
   it("handles toolkit:model:design", async () => {
-    const result = await handleToolkitToolCall(
-      "toolkit:model:design",
-      { action: "show" },
-      {}
-    );
+    const result = await handleToolkitToolCall("toolkit:model:design", { action: "show" }, {});
 
     expect(result).not.toBeNull();
     expect(result?.content).toBeDefined();

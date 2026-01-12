@@ -49,7 +49,10 @@ function parseOpenAPI(content: string): EntityDefinition[] {
             const ps = propSchema as Record<string, unknown>;
             return {
               name: propName,
-              type: mapOpenAPIType(ps.type as string, ps.format as string | undefined) as PropertyType,
+              type: mapOpenAPIType(
+                ps.type as string,
+                ps.format as string | undefined
+              ) as PropertyType,
               description: (ps.description as string) || undefined,
               required: ((s.required as string[]) || []).includes(propName),
               unique: false,
@@ -104,22 +107,19 @@ function parseJsonSchema(content: string): EntityDefinition[] {
 /**
  * Convert a JSON Schema object to an EntityDefinition
  */
-function schemaToEntity(
-  schema: Record<string, unknown>,
-  name: string
-): EntityDefinition {
-  const properties = Object.entries(
-    (schema.properties as Record<string, unknown>) || {}
-  ).map(([propName, propSchema]) => {
-    const ps = propSchema as Record<string, unknown>;
-    return {
-      name: propName,
-      type: mapJsonSchemaType(ps.type as string, ps.format as string | undefined) as PropertyType,
-      description: (ps.description as string) || undefined,
-      required: ((schema.required as string[]) || []).includes(propName),
-      unique: false,
-    };
-  });
+function schemaToEntity(schema: Record<string, unknown>, name: string): EntityDefinition {
+  const properties = Object.entries((schema.properties as Record<string, unknown>) || {}).map(
+    ([propName, propSchema]) => {
+      const ps = propSchema as Record<string, unknown>;
+      return {
+        name: propName,
+        type: mapJsonSchemaType(ps.type as string, ps.format as string | undefined) as PropertyType,
+        description: (ps.description as string) || undefined,
+        required: ((schema.required as string[]) || []).includes(propName),
+        unique: false,
+      };
+    }
+  );
 
   return {
     name: toPascalCase(name),
@@ -139,10 +139,7 @@ function parseText(content: string): EntityDefinition[] {
   const entities: EntityDefinition[] = [];
 
   // Look for patterns like "User has name, email, password"
-  const patterns = [
-    /(\w+)\s+(?:has|contains|includes)\s+(.+)/gi,
-    /(\w+):\s*(.+)/gi,
-  ];
+  const patterns = [/(\w+)\s+(?:has|contains|includes)\s+(.+)/gi, /(\w+):\s*(.+)/gi];
 
   for (const pattern of patterns) {
     let match;
@@ -220,10 +217,7 @@ function toCamelCase(str: string): string {
 /**
  * Handle model import tool call
  */
-export async function handleModelImport(
-  args: unknown,
-  _context: unknown
-): Promise<CallToolResult> {
+export async function handleModelImport(args: unknown, _context: unknown): Promise<CallToolResult> {
   // Validate input
   const parseResult = ModelImportInputSchema.safeParse(args);
   if (!parseResult.success) {

@@ -97,7 +97,10 @@ export const EntityDefinitionSchema = z.object({
     .describe("Entity name (PascalCase)"),
   description: z.string().max(1000).describe("Human-readable description of this entity"),
   properties: z.array(PropertyDefinitionSchema).min(1).describe("Entity properties"),
-  relationships: z.array(RelationshipDefinitionSchema).default([]).describe("Relationships to other entities"),
+  relationships: z
+    .array(RelationshipDefinitionSchema)
+    .default([])
+    .describe("Relationships to other entities"),
   tags: z.array(z.string()).default([]).describe("Tags for categorization"),
 });
 
@@ -138,13 +141,7 @@ export const GenerationTierSchema = z.enum([
 /**
  * Target client for setup
  */
-export const ClientTargetSchema = z.enum([
-  "claude-desktop",
-  "cursor",
-  "vscode",
-  "cli",
-  "custom",
-]);
+export const ClientTargetSchema = z.enum(["claude-desktop", "cursor", "vscode", "cli", "custom"]);
 
 /**
  * Toolkit state - tracks progress through the workflow
@@ -157,7 +154,10 @@ export const ToolkitStateSchema = z.object({
   model: DomainModelSchema.optional().describe("The domain model being designed"),
   generationTier: GenerationTierSchema.optional().describe("Selected generation tier"),
   generatedFiles: z.array(z.string()).default([]).describe("Files that have been generated"),
-  configuredClients: z.array(ClientTargetSchema).default([]).describe("Clients that have been configured"),
+  configuredClients: z
+    .array(ClientTargetSchema)
+    .default([])
+    .describe("Clients that have been configured"),
 });
 
 // =============================================================================
@@ -189,10 +189,7 @@ export const ModelImportInputSchema = z.object({
     .enum(["openapi", "json-schema", "text", "url"])
     .describe("Source format to import from"),
   content: z.string().describe("Content to import (file path, URL, or inline content)"),
-  merge: z
-    .boolean()
-    .default(true)
-    .describe("Merge with existing model (true) or replace (false)"),
+  merge: z.boolean().default(true).describe("Merge with existing model (true) or replace (false)"),
 });
 
 /**
@@ -205,10 +202,7 @@ export const GenerateInputSchema = z.object({
     .optional()
     .describe("Specific entities to generate (all if omitted)"),
   outputDir: z.string().optional().describe("Output directory (default: src/generated)"),
-  dryRun: z
-    .boolean()
-    .default(false)
-    .describe("Preview without writing files"),
+  dryRun: z.boolean().default(false).describe("Preview without writing files"),
 });
 
 /**
@@ -217,10 +211,7 @@ export const GenerateInputSchema = z.object({
 export const SetupClientInputSchema = z.object({
   client: ClientTargetSchema.describe("Target client to configure"),
   serverPath: z.string().optional().describe("Path to MCP server (auto-detected if omitted)"),
-  options: z
-    .record(z.string())
-    .optional()
-    .describe("Client-specific options"),
+  options: z.record(z.string()).optional().describe("Client-specific options"),
 });
 
 /**

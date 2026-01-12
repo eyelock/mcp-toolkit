@@ -215,6 +215,91 @@ describe("HookRegistry", () => {
       const hooks = registry.query({ feature: "sampling" });
       expect(hooks.some((h) => h.tag === "sampling-hook")).toBe(true);
     });
+
+    it("filters by requiresConfig", () => {
+      registry.register(
+        createTestHook({
+          tag: "config-hook",
+          conditions: { requiresConfig: { debugMode: true, level: "verbose" } },
+        })
+      );
+
+      // Without config context, hook is included (requiresConfig only checked when config provided)
+      const hooksWithoutConfig = registry.query({});
+      expect(hooksWithoutConfig.some((h) => h.tag === "config-hook")).toBe(true);
+
+      // With matching config, hook is included
+      const hooksWithMatch = registry.query({
+        config: { debugMode: true, level: "verbose" },
+      });
+      expect(hooksWithMatch.some((h) => h.tag === "config-hook")).toBe(true);
+
+      // With partial config match, hook is excluded
+      const hooksPartialMatch = registry.query({
+        config: { debugMode: true, level: "info" },
+      });
+      expect(hooksPartialMatch.some((h) => h.tag === "config-hook")).toBe(false);
+
+      // With mismatched config, hook is excluded
+      const hooksMismatch = registry.query({
+        config: { debugMode: false },
+      });
+      expect(hooksMismatch.some((h) => h.tag === "config-hook")).toBe(false);
+    });
+  });
+
+  describe("session and request filtering", () => {
+    it("filters by sessionId - includes hooks without sessionId", () => {
+      registry.register(createTestHook({ tag: "global-hook" }));
+      registry.register(createTestHook({ tag: "session-hook", sessionId: "session-123" }));
+      registry.register(createTestHook({ tag: "other-session-hook", sessionId: "session-456" }));
+
+      const hooks = registry.query({ sessionId: "session-123" });
+
+      // Should include global hook (no sessionId) and matching session hook
+      expect(hooks.some((h) => h.tag === "global-hook")).toBe(true);
+      expect(hooks.some((h) => h.tag === "session-hook")).toBe(true);
+      // Should exclude hook with different sessionId
+      expect(hooks.some((h) => h.tag === "other-session-hook")).toBe(false);
+    });
+
+    it("filters by requestId - includes hooks without requestId", () => {
+      registry.register(createTestHook({ tag: "global-hook" }));
+      registry.register(createTestHook({ tag: "request-hook", requestId: "req-abc" }));
+      registry.register(createTestHook({ tag: "other-request-hook", requestId: "req-xyz" }));
+
+      const hooks = registry.query({ requestId: "req-abc" });
+
+      // Should include global hook (no requestId) and matching request hook
+      expect(hooks.some((h) => h.tag === "global-hook")).toBe(true);
+      expect(hooks.some((h) => h.tag === "request-hook")).toBe(true);
+      // Should exclude hook with different requestId
+      expect(hooks.some((h) => h.tag === "other-request-hook")).toBe(false);
+    });
+
+    it("filters by both sessionId and requestId", () => {
+      registry.register(createTestHook({ tag: "global-hook" }));
+      registry.register(
+        createTestHook({
+          tag: "scoped-hook",
+          sessionId: "session-123",
+          requestId: "req-abc",
+        })
+      );
+      registry.register(
+        createTestHook({
+          tag: "wrong-session",
+          sessionId: "session-other",
+          requestId: "req-abc",
+        })
+      );
+
+      const hooks = registry.query({ sessionId: "session-123", requestId: "req-abc" });
+
+      expect(hooks.some((h) => h.tag === "global-hook")).toBe(true);
+      expect(hooks.some((h) => h.tag === "scoped-hook")).toBe(true);
+      expect(hooks.some((h) => h.tag === "wrong-session")).toBe(false);
+    });
   });
 
   describe("all", () => {

@@ -43,7 +43,19 @@ describe("PropertyDefinitionSchema", () => {
   });
 
   it("allows all valid property types", () => {
-    const types = ["string", "number", "boolean", "date", "datetime", "uuid", "email", "url", "json", "array", "object"];
+    const types = [
+      "string",
+      "number",
+      "boolean",
+      "date",
+      "datetime",
+      "uuid",
+      "email",
+      "url",
+      "json",
+      "array",
+      "object",
+    ];
 
     for (const type of types) {
       const result = PropertyDefinitionSchema.safeParse({

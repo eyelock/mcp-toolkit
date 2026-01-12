@@ -195,10 +195,7 @@ function detectServerPath(): string | null {
 /**
  * Handle setup client tool call
  */
-export async function handleSetupClient(
-  args: unknown,
-  _context: unknown
-): Promise<CallToolResult> {
+export async function handleSetupClient(args: unknown, _context: unknown): Promise<CallToolResult> {
   // Validate input
   const parseResult = SetupClientInputSchema.safeParse(args);
   if (!parseResult.success) {
@@ -230,7 +227,7 @@ export async function handleSetupClient(
               "For custom clients, you'll need to manually configure:",
               "",
               "1. **Command**: `node`",
-              "2. **Args**: `[\"<path-to-your-server>/dist/index.js\"]`",
+              '2. **Args**: `["<path-to-your-server>/dist/index.js"]`',
               "3. **Transport**: stdio (most common)",
               "",
               "Example configuration:",
@@ -366,10 +363,7 @@ export async function handleSetupClient(
 /**
  * Handle setup verify tool call
  */
-export async function handleSetupVerify(
-  args: unknown,
-  _context: unknown
-): Promise<CallToolResult> {
+export async function handleSetupVerify(args: unknown, _context: unknown): Promise<CallToolResult> {
   // Validate input
   const parseResult = SetupVerifyInputSchema.safeParse(args);
   if (!parseResult.success) {

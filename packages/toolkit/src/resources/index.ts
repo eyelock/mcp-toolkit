@@ -10,16 +10,8 @@ import type {
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/types.js";
 import { MODEL_RESOURCE_URI, modelResource, readModelResource } from "./model.js";
-import {
-  clientsResourceTemplate,
-  getClientNames,
-  readClientConfigResource,
-} from "./clients.js";
-import {
-  getTemplateTypes,
-  readTemplateResource,
-  templatesResourceTemplate,
-} from "./templates.js";
+import { clientsResourceTemplate, getClientNames, readClientConfigResource } from "./clients.js";
+import { getTemplateTypes, readTemplateResource, templatesResourceTemplate } from "./templates.js";
 
 // Re-export individual resources
 export * from "./model.js";
@@ -56,9 +48,7 @@ export function registerToolkitResourceTemplates(): ResourceTemplate[] {
 /**
  * Handle a toolkit resource read
  */
-export async function handleToolkitResourceRead(
-  uri: string
-): Promise<ReadResourceResult | null> {
+export async function handleToolkitResourceRead(uri: string): Promise<ReadResourceResult | null> {
   // Check static resources
   if (uri === MODEL_RESOURCE_URI) {
     return readModelResource();

@@ -110,22 +110,14 @@ export type {
 // ===========================================================================
 
 import { allToolkitHooks, toolkitBlockingHooks, CONFIG_HOOK_ID } from "./hooks/index.js";
-import {
-  handleToolkitToolCall,
-  isToolkitTool,
-  toolkitTools,
-} from "./tools/index.js";
+import { handleToolkitToolCall, isToolkitTool, toolkitTools } from "./tools/index.js";
 import {
   handleToolkitResourceRead,
   isToolkitResource,
   toolkitResources,
   toolkitResourceTemplates,
 } from "./resources/index.js";
-import {
-  handleToolkitPrompt,
-  isToolkitPrompt,
-  toolkitPrompts,
-} from "./prompts/index.js";
+import { handleToolkitPrompt, isToolkitPrompt, toolkitPrompts } from "./prompts/index.js";
 
 // ===========================================================================
 // Hook Management
@@ -270,7 +262,11 @@ export interface ToolkitHandlers {
   /** Check if a tool name belongs to the toolkit */
   isToolkitTool: (name: string) => boolean;
   /** Handle a toolkit tool call */
-  handleToolCall: (name: string, args: unknown, context: ToolkitContext) => Promise<CallToolResult | null>;
+  handleToolCall: (
+    name: string,
+    args: unknown,
+    context: ToolkitContext
+  ) => Promise<CallToolResult | null>;
   /** Check if a resource URI belongs to the toolkit */
   isToolkitResource: (uri: string) => boolean;
   /** Handle a toolkit resource read */
@@ -278,7 +274,10 @@ export interface ToolkitHandlers {
   /** Check if a prompt name belongs to the toolkit */
   isToolkitPrompt: (name: string) => boolean;
   /** Handle a toolkit prompt request */
-  handlePrompt: (name: string, args: Record<string, string> | undefined) => Promise<GetPromptResult | null>;
+  handlePrompt: (
+    name: string,
+    args: Record<string, string> | undefined
+  ) => Promise<GetPromptResult | null>;
 }
 
 /**

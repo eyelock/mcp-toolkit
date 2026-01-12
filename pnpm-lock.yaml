@@ -32,12 +32,12 @@ importers:
 
   packages/cli:
     dependencies:
+      '@mcp-toolkit/core':
+        specifier: workspace:*
+        version: link:../core
       '@mcp-toolkit/model':
         specifier: workspace:*
         version: link:../model
-      '@mcp-toolkit/storage':
-        specifier: workspace:*
-        version: link:../storage
       '@oclif/core':
         specifier: ^4.2.10
         version: 4.8.0
@@ -66,6 +66,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@mcp-toolkit/model':
+        specifier: workspace:*
+        version: link:../model
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -97,9 +100,6 @@ importers:
       '@mcp-toolkit/model':
         specifier: workspace:*
         version: link:../model
-      '@mcp-toolkit/storage':
-        specifier: workspace:*
-        version: link:../storage
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.25.1(hono@4.11.3)(zod@3.25.76)
@@ -164,31 +164,6 @@ importers:
 
   packages/shared/vitest:
     dependencies:
-      vitest:
-        specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.3)
-
-  packages/storage:
-    dependencies:
-      '@mcp-toolkit/model':
-        specifier: workspace:*
-        version: link:../model
-    devDependencies:
-      '@mcp-toolkit/typescript-config':
-        specifier: workspace:*
-        version: link:../shared/typescript
-      '@mcp-toolkit/vitest-config':
-        specifier: workspace:*
-        version: link:../shared/vitest
-      '@types/node':
-        specifier: ^22.10.5
-        version: 22.19.3
-      '@vitest/coverage-v8':
-        specifier: ^2.1.8
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3))
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.3)

@@ -1,7 +1,7 @@
 import { SessionConfigSchema } from "@mcp-toolkit/model";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Test index.ts re-exports
-import * as ProviderExports from "./index.js";
+import * as StorageExports from "./index.js";
 import { MemoryProvider, createMemoryProvider } from "./memory.js";
 
 describe("MemoryProvider", () => {
@@ -190,9 +190,9 @@ describe("createMemoryProvider", () => {
   });
 });
 
-describe("index exports", () => {
-  it("re-exports all provider exports", () => {
-    expect(ProviderExports.MemoryProvider).toBeDefined();
-    expect(ProviderExports.createMemoryProvider).toBeDefined();
+describe("storage exports", () => {
+  it("re-exports all storage exports", () => {
+    expect(StorageExports.MemoryProvider).toBeDefined();
+    expect(StorageExports.createMemoryProvider).toBeDefined();
   });
 });

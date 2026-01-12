@@ -13,6 +13,10 @@
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
     }
   },
   "files": [
@@ -28,6 +32,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@mcp-toolkit/model": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

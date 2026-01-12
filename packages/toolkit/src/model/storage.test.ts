@@ -5,7 +5,7 @@
 import { mkdirSync, rmSync, existsSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, beforeEach, describe, expect, it, } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ToolkitStorage, createToolkitStorage } from "./storage.js";
 import type { EntityDefinition } from "./schema.js";
 

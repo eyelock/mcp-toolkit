@@ -22,8 +22,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@mcp-toolkit/core": "workspace:*",
     "@mcp-toolkit/model": "workspace:*",
-    "@mcp-toolkit/storage": "workspace:*",
     "@oclif/core": "^4.2.10",
     "zod": "^3.24.1"
   },

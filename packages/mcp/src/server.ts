@@ -11,9 +11,9 @@
  */
 
 import { randomUUID } from "node:crypto";
+import type { SessionProvider } from "@mcp-toolkit/core";
+import { createMemoryProvider } from "@mcp-toolkit/core";
 import type { ServerIdentity, ToolDelegationConfig } from "@mcp-toolkit/model";
-import type { SessionProvider } from "@mcp-toolkit/storage";
-import { createMemoryProvider } from "@mcp-toolkit/storage";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,

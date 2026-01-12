@@ -6,7 +6,7 @@
  */
 
 import { SessionFeaturesSchema } from "@mcp-toolkit/model";
-import { createMemoryProvider } from "@mcp-toolkit/storage";
+import { createMemoryProvider } from "@mcp-toolkit/core";
 import { Args, Command, Flags } from "@oclif/core";
 
 export default class Init extends Command {

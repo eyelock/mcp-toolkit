@@ -1,5 +1,5 @@
 /**
- * Provider Interface - Contract for pluggable storage backends
+ * Storage Interface - Contract for pluggable storage backends
  *
  * This module uses the Consumer/Publisher pattern for session management:
  * - SessionConsumer: Reads/queries session data
@@ -89,9 +89,8 @@ export interface SessionPublisher {
  * Session provider interface - combined consumer and publisher
  *
  * Implementations:
- * - MemoryProvider: In-memory storage (default, no external deps)
- * - FileProvider: File-based storage (optional)
- * - Custom: Implement this interface for your own storage
+ * - MemoryProvider: In-memory storage (default, included in core)
+ * - Custom: Implement this interface for your own storage backend
  *
  * Providers implement both consumer and publisher capabilities.
  * Components can depend on just SessionConsumer or SessionPublisher

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Canonical MCP server configuration for development. Use 'make mcp.install' to deploy to IDE clients.",
+  "servers": {
+    "mcp-toolkit-dev": {
+      "command": "node",
+      "args": ["packages/mcp/dist/index.js", "--stdio"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}

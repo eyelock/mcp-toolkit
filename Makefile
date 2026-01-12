@@ -1,4 +1,4 @@
-.PHONY: rebuild build test check lint format clean mcp mcp.stdio mcp.http cli docs worktree worktree.update worktree.delete help
+.PHONY: rebuild build test check lint format clean mcp mcp.stdio mcp.http mcp.install mcp.install.cursor mcp.install.vscode mcp.install.claude cli docs worktree worktree.update worktree.delete help
 
 # Build & Development
 rebuild:
@@ -38,6 +38,22 @@ mcp.stdio:
 mcp.http:
 	pnpm --filter @mcp-toolkit/mcp build
 	pnpm --filter @mcp-toolkit/mcp start:http
+
+# MCP Config Installation (deploy to IDE clients)
+mcp.install: build
+	@./scripts/mcp-install.sh all
+
+mcp.install.cursor: build
+	@./scripts/mcp-install.sh cursor
+
+mcp.install.vscode: build
+	@./scripts/mcp-install.sh vscode
+
+mcp.install.claude: build
+	@./scripts/mcp-install.sh claude
+
+mcp.show:
+	@./scripts/mcp-install.sh show
 
 # CLI
 cli:
@@ -110,6 +126,7 @@ help:
 	@echo "Build:     rebuild build test clean"
 	@echo "Quality:   check lint format"
 	@echo "MCP:       mcp mcp.stdio mcp.http"
+	@echo "MCP Setup: mcp.install mcp.install.cursor mcp.install.vscode mcp.install.claude mcp.show"
 	@echo "CLI:       cli"
 	@echo "Docs:      docs"
 	@echo "Worktree:  worktree worktree.update worktree.delete"

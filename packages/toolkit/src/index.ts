@@ -7,11 +7,28 @@
  * This package is self-contained and can be removed without affecting
  * the core MCP Toolkit functionality.
  *
+ * ## Features
+ *
+ * - **Model Design**: Conversational domain model design
+ * - **Code Generation**: Three-tier code generation (definitions, stubs, full)
+ * - **Client Setup**: Automated configuration for Claude Desktop, Cursor, VS Code, CLI
+ * - **Resources**: Access to model, templates, and client configs
+ * - **Prompts**: Guided workflows for design and setup
+ *
  * @module @mcp-toolkit/toolkit
  */
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type {
+  CallToolResult,
+  GetPromptResult,
+  ReadResourceResult,
+  Resource,
+  ResourceTemplate,
+  Tool,
+  Prompt,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   HookRegistry,
   HookContentLoader,
@@ -21,8 +38,64 @@ import {
 } from "@mcp-toolkit/core";
 import { registerBlockingHook, type WorkflowStateTracker } from "@mcp-toolkit/mcp";
 
-// Re-export all hook definitions
+// ===========================================================================
+// Re-exports
+// ===========================================================================
+
+// Hook definitions
 export * from "./hooks/index.js";
+
+// Model schemas and storage (explicit exports to avoid conflicts with hooks)
+export {
+  // Schemas
+  PropertyTypeSchema,
+  PropertyDefinitionSchema,
+  RelationshipTypeSchema,
+  RelationshipDefinitionSchema,
+  EntityDefinitionSchema,
+  DomainModelSchema,
+  GenerationTierSchema,
+  ClientTargetSchema,
+  ToolkitStateSchema,
+  EntityInputSchema,
+  ModelDesignInputSchema,
+  ModelImportInputSchema,
+  GenerateInputSchema,
+  SetupClientInputSchema,
+  SetupVerifyInputSchema,
+  // Types
+  type PropertyType,
+  type PropertyDefinition,
+  type RelationshipType,
+  type RelationshipDefinition,
+  type EntityDefinition as ToolkitEntityDefinition,
+  type DomainModel as ToolkitDomainModel,
+  type GenerationTier,
+  type ClientTarget,
+  type ToolkitState,
+  type EntityInput,
+  type ModelDesignInput,
+  type ModelImportInput,
+  type GenerateInput,
+  type SetupClientInput,
+  type SetupVerifyInput,
+  // Storage
+  MODEL_FILENAME,
+  STATE_FILENAME,
+  type StorageOptions,
+  type StorageResult,
+  ToolkitStorage,
+  createToolkitStorage,
+} from "./model/index.js";
+
+// MCP Tools
+export * from "./tools/index.js";
+
+// MCP Resources
+export * from "./resources/index.js";
+
+// MCP Prompts
+export * from "./prompts/index.js";
 
 // Re-export hook types from core for convenience
 export type {
@@ -32,7 +105,31 @@ export type {
   ComposedHooksResult,
 } from "@mcp-toolkit/core";
 
+// ===========================================================================
+// Imports for internal use
+// ===========================================================================
+
 import { allToolkitHooks, toolkitBlockingHooks, CONFIG_HOOK_ID } from "./hooks/index.js";
+import {
+  handleToolkitToolCall,
+  isToolkitTool,
+  toolkitTools,
+} from "./tools/index.js";
+import {
+  handleToolkitResourceRead,
+  isToolkitResource,
+  toolkitResources,
+  toolkitResourceTemplates,
+} from "./resources/index.js";
+import {
+  handleToolkitPrompt,
+  isToolkitPrompt,
+  toolkitPrompts,
+} from "./prompts/index.js";
+
+// ===========================================================================
+// Hook Management
+// ===========================================================================
 
 /**
  * Get the path to the hooks directory (where .md content files live)
@@ -131,4 +228,93 @@ export function markToolkitConfigured(
   config: Record<string, unknown>
 ): void {
   tracker.markHookCompleted(CONFIG_HOOK_ID, config);
+}
+
+// ===========================================================================
+// MCP Component Registration
+// ===========================================================================
+
+/**
+ * Toolkit MCP components for registration with a server
+ */
+export interface ToolkitComponents {
+  tools: Tool[];
+  resources: Resource[];
+  resourceTemplates: ResourceTemplate[];
+  prompts: Prompt[];
+}
+
+/**
+ * Get all toolkit MCP components
+ */
+export function getToolkitComponents(): ToolkitComponents {
+  return {
+    tools: toolkitTools,
+    resources: toolkitResources,
+    resourceTemplates: toolkitResourceTemplates,
+    prompts: toolkitPrompts,
+  };
+}
+
+/**
+ * Toolkit handler context
+ */
+export interface ToolkitContext {
+  [key: string]: unknown;
+}
+
+/**
+ * Toolkit handlers for MCP requests
+ */
+export interface ToolkitHandlers {
+  /** Check if a tool name belongs to the toolkit */
+  isToolkitTool: (name: string) => boolean;
+  /** Handle a toolkit tool call */
+  handleToolCall: (name: string, args: unknown, context: ToolkitContext) => Promise<CallToolResult | null>;
+  /** Check if a resource URI belongs to the toolkit */
+  isToolkitResource: (uri: string) => boolean;
+  /** Handle a toolkit resource read */
+  handleResourceRead: (uri: string) => Promise<ReadResourceResult | null>;
+  /** Check if a prompt name belongs to the toolkit */
+  isToolkitPrompt: (name: string) => boolean;
+  /** Handle a toolkit prompt request */
+  handlePrompt: (name: string, args: Record<string, string> | undefined) => Promise<GetPromptResult | null>;
+}
+
+/**
+ * Get toolkit handlers for integration with a server
+ */
+export function getToolkitHandlers(): ToolkitHandlers {
+  return {
+    isToolkitTool,
+    handleToolCall: handleToolkitToolCall,
+    isToolkitResource,
+    handleResourceRead: handleToolkitResourceRead,
+    isToolkitPrompt,
+    handlePrompt: handleToolkitPrompt,
+  };
+}
+
+// ===========================================================================
+// Convenience Exports
+// ===========================================================================
+
+/**
+ * Register all toolkit components and return handlers
+ *
+ * Use this for quick integration:
+ * ```typescript
+ * const toolkit = registerToolkit();
+ * // Add toolkit.components to your server registration
+ * // Use toolkit.handlers in your request handlers
+ * ```
+ */
+export function registerToolkit(): {
+  components: ToolkitComponents;
+  handlers: ToolkitHandlers;
+} {
+  return {
+    components: getToolkitComponents(),
+    handlers: getToolkitHandlers(),
+  };
 }

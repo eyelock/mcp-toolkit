@@ -147,6 +147,19 @@ export const HookDefinitionSchema = z
 
     // Tags for categorization
     tags: z.array(z.string()).default([]).describe("Tags for categorization and filtering"),
+
+    // Workflow control
+    blocking: z
+      .boolean()
+      .default(false)
+      .describe(
+        "If true, this hook blocks further tool execution until its workflow completes (e.g., config gathering)"
+      ),
+
+    dependencies: z
+      .array(z.string())
+      .default([])
+      .describe("Hook IDs that must complete before this hook can be active"),
   })
   .transform((data) => ({
     ...data,
@@ -163,6 +176,8 @@ export const HookDefinitionInputSchema = HookDefinitionSchema.innerType().partia
   app: true,
   priority: true,
   tags: true,
+  blocking: true,
+  dependencies: true,
 });
 
 export type HookDefinitionInput = z.input<typeof HookDefinitionInputSchema>;

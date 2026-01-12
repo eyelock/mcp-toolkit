@@ -73,3 +73,17 @@ export {
   createSessionStateTracker,
   createBlockingResponse,
 } from "./session-state.js";
+
+// Workflow State (Hook-based blocking)
+export {
+  type HookCompletionStatus,
+  type BlockingHookDef,
+  type WorkflowCheckResult,
+  WorkflowStateTracker,
+  createWorkflowStateTracker,
+  getDefaultWorkflowTracker,
+  resetDefaultWorkflowTracker,
+  checkWorkflowAllowed,
+  registerBlockingHook,
+  markWorkflowHookCompleted,
+} from "./workflow-state.js";

@@ -1,0 +1,61 @@
+{
+  "name": "@mcp-toolkit/testing",
+  "version": "0.1.0",
+  "description": "Testing harness and evals framework for MCP Toolkit",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./harness": {
+      "types": "./dist/harness/index.d.ts",
+      "import": "./dist/harness/index.js"
+    },
+    "./evals": {
+      "types": "./dist/evals/index.d.ts",
+      "import": "./dist/evals/index.js"
+    },
+    "./judge": {
+      "types": "./dist/judge/index.d.ts",
+      "import": "./dist/judge/index.js"
+    },
+    "./reporters": {
+      "types": "./dist/reporters/index.d.ts",
+      "import": "./dist/reporters/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@mcp-toolkit/core": "workspace:*",
+    "@mcp-toolkit/model": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@mcp-toolkit/typescript-config": "workspace:*",
+    "@mcp-toolkit/vitest-config": "workspace:*",
+    "@vitest/coverage-v8": "^2.1.8",
+    "typescript": "^5.8.2",
+    "vitest": "^2.1.9"
+  },
+  "keywords": [
+    "mcp",
+    "testing",
+    "evals",
+    "model-context-protocol"
+  ],
+  "license": "MIT"
+}

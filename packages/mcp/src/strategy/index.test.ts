@@ -7,10 +7,14 @@ import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DELEGATION_TIMEOUT_MS,
+  DelegationUnavailableError,
+  ExecutionStrategyError,
   classifyTool,
   classifyToolByName,
   clientSupportsSampling,
+  executeWithDelegation,
   extractTextFromSamplingResponse,
+  getClientCapabilities,
   getToolsByClassification,
   resolveToolDelegation,
   toolBenefitsFromSampling,
@@ -233,6 +237,25 @@ describe("Tool Delegation", () => {
     });
   });
 
+  describe("getClientCapabilities", () => {
+    it("returns undefined when server is undefined", () => {
+      expect(getClientCapabilities(undefined)).toBeUndefined();
+    });
+
+    it("returns client capabilities from server", () => {
+      const mockServer = {
+        _clientCapabilities: { sampling: {}, tools: {} },
+      } as unknown as Server;
+      const caps = getClientCapabilities(mockServer);
+      expect(caps).toEqual({ sampling: {}, tools: {} });
+    });
+
+    it("returns undefined when server has no capabilities", () => {
+      const mockServer = {} as unknown as Server;
+      expect(getClientCapabilities(mockServer)).toBeUndefined();
+    });
+  });
+
   describe("extractTextFromSamplingResponse", () => {
     it("extracts text from string content", () => {
       const result = extractTextFromSamplingResponse({
@@ -279,6 +302,195 @@ describe("Tool Delegation", () => {
       });
 
       expect(result).toBe("Text content\nMore text");
+    });
+
+    it("returns stringified content for unknown content types", () => {
+      const result = extractTextFromSamplingResponse({
+        role: "assistant",
+        model: "test",
+        content: 12345 as unknown as string,
+      });
+
+      expect(result).toBe("12345");
+    });
+  });
+
+  describe("executeWithDelegation", () => {
+    const mockServerWithSampling = {
+      _clientCapabilities: { sampling: {} },
+    } as unknown as Server;
+
+    const mockServerWithoutSampling = {
+      _clientCapabilities: {},
+    } as unknown as Server;
+
+    it("executes locally for local-only mode", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => ({ result: "delegated" });
+
+      const result = await executeWithDelegation(
+        mockServerWithSampling,
+        {},
+        delegateFn,
+        localFn,
+        { mode: "local-only", toolName: "test_tool" }
+      );
+
+      expect(result.outcome).toBe("local");
+      expect(result.result).toEqual({ result: "local" });
+    });
+
+    it("throws for delegate-only mode without sampling support", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => ({ result: "delegated" });
+
+      await expect(
+        executeWithDelegation(
+          mockServerWithoutSampling,
+          {},
+          delegateFn,
+          localFn,
+          { mode: "delegate-only", toolName: "test_tool" }
+        )
+      ).rejects.toThrow(DelegationUnavailableError);
+    });
+
+    it("delegates for delegate-only mode with sampling support", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => ({ result: "delegated" });
+
+      const result = await executeWithDelegation(
+        mockServerWithSampling,
+        {},
+        delegateFn,
+        localFn,
+        { mode: "delegate-only", toolName: "test_tool" }
+      );
+
+      expect(result.outcome).toBe("delegated");
+      expect(result.result).toEqual({ result: "delegated" });
+    });
+
+    it("throws when delegation fails with fallback disabled", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => {
+        throw new Error("Delegation error");
+      };
+
+      await expect(
+        executeWithDelegation(
+          mockServerWithSampling,
+          {},
+          delegateFn,
+          localFn,
+          { mode: "delegate-first", fallbackEnabled: false, toolName: "test_tool" }
+        )
+      ).rejects.toThrow(ExecutionStrategyError);
+    });
+
+    it("successfully delegates in delegate-first mode", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => ({ result: "delegated-success" });
+
+      const result = await executeWithDelegation(
+        mockServerWithSampling,
+        {},
+        delegateFn,
+        localFn,
+        { mode: "delegate-first", toolName: "test_tool" }
+      );
+
+      expect(result.outcome).toBe("delegated");
+      expect(result.result).toEqual({ result: "delegated-success" });
+      expect(result.delegationAttempted).toBe(true);
+    });
+
+    it("falls back to local when delegation fails", async () => {
+      const localFn = async () => ({ result: "local-fallback" });
+      const delegateFn = async () => {
+        throw new Error("Delegation error");
+      };
+
+      const result = await executeWithDelegation(
+        mockServerWithSampling,
+        {},
+        delegateFn,
+        localFn,
+        { mode: "delegate-first", fallbackEnabled: true, toolName: "test_tool" }
+      );
+
+      expect(result.outcome).toBe("fallback-local");
+      expect(result.result).toEqual({ result: "local-fallback" });
+      expect(result.delegationError).toContain("Delegation error");
+    });
+
+    it("throws when both delegation and local fail", async () => {
+      const localFn = async () => {
+        throw new Error("Local error");
+      };
+      const delegateFn = async () => {
+        throw new Error("Delegation error");
+      };
+
+      await expect(
+        executeWithDelegation(
+          mockServerWithSampling,
+          {},
+          delegateFn,
+          localFn,
+          { mode: "delegate-first", fallbackEnabled: true, toolName: "test_tool" }
+        )
+      ).rejects.toThrow(ExecutionStrategyError);
+    });
+
+    it("uses local execution directly when sampling unavailable in delegate-first mode", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => ({ result: "delegated" });
+
+      const result = await executeWithDelegation(
+        mockServerWithoutSampling,
+        {},
+        delegateFn,
+        localFn,
+        { mode: "delegate-first", toolName: "test_tool" }
+      );
+
+      expect(result.outcome).toBe("local");
+      expect(result.delegationAttempted).toBe(false);
+    });
+
+    it("throws when local execution fails for local-only mode", async () => {
+      const localFn = async () => {
+        throw new Error("Local execution failed");
+      };
+      const delegateFn = async () => ({ result: "delegated" });
+
+      await expect(
+        executeWithDelegation(
+          mockServerWithSampling,
+          {},
+          delegateFn,
+          localFn,
+          { mode: "local-only", toolName: "test_tool" }
+        )
+      ).rejects.toThrow(ExecutionStrategyError);
+    });
+
+    it("throws when delegation fails for delegate-only mode", async () => {
+      const localFn = async () => ({ result: "local" });
+      const delegateFn = async () => {
+        throw new Error("Delegation failed");
+      };
+
+      await expect(
+        executeWithDelegation(
+          mockServerWithSampling,
+          {},
+          delegateFn,
+          localFn,
+          { mode: "delegate-only", toolName: "test_tool" }
+        )
+      ).rejects.toThrow(ExecutionStrategyError);
     });
   });
 

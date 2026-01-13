@@ -296,3 +296,46 @@ describe("PRESET_RUBRICS", () => {
     }
   });
 });
+
+describe("LLMJudge JSON Parsing Edge Cases", () => {
+  it("handles malformed JSON in response", async () => {
+    const client: LLMClient = {
+      async chat() {
+        return {
+          content: '{ "passed": true, "score": invalid_syntax }',
+        };
+      },
+    };
+
+    const judge = new LLMJudge({ client });
+    const result = await judge.evaluate({
+      criteria: "Test criteria",
+      content: "Test content",
+    });
+
+    // JSON.parse should fail, triggering catch block
+    expect(result.passed).toBe(false);
+    expect(result.score).toBe(0);
+    expect(result.reasoning).toContain("parse");
+  });
+
+  it("handles response with no JSON object", async () => {
+    const client: LLMClient = {
+      async chat() {
+        return {
+          content: "This response has no JSON at all, just plain text",
+        };
+      },
+    };
+
+    const judge = new LLMJudge({ client });
+    const result = await judge.evaluate({
+      criteria: "Test criteria",
+      content: "Test content",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.score).toBe(0);
+    expect(result.reasoning).toContain("Could not parse");
+  });
+});

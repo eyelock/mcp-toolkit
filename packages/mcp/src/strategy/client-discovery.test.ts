@@ -290,10 +290,7 @@ describe("Client Discovery", () => {
 
       await discoverClientMetadata(mockServer, 60000);
 
-      expect(mockServer.createMessage).toHaveBeenCalledWith(
-        expect.any(Object),
-        { timeout: 60000 }
-      );
+      expect(mockServer.createMessage).toHaveBeenCalledWith(expect.any(Object), { timeout: 60000 });
     });
   });
 

@@ -341,3 +341,56 @@ describe("runTestCases", () => {
     expect(results[1].passed).toBe(true);
   });
 });
+
+describe("registerResource", () => {
+  it("registers a resource handler", () => {
+    const harness = createTestHarness();
+    const handler = vi.fn(async () => ({
+      contents: [{ uri: "test://resource", text: "content" }],
+    }));
+
+    harness.registerResource("test://resource", handler);
+
+    expect(harness.listResources()).toContain("test://resource");
+  });
+
+  it("allows reading registered resource", async () => {
+    const harness = createTestHarness();
+    const handler = vi.fn(async () => ({
+      contents: [{ uri: "test://data", text: "Hello Resource" }],
+    }));
+
+    harness.registerResource("test://data", handler);
+
+    const result = await harness.readResource("test://data");
+    expect(handler).toHaveBeenCalled();
+    expect(result.contents).toHaveLength(1);
+    expect(result.contents[0].text).toBe("Hello Resource");
+  });
+});
+
+describe("registerPrompt", () => {
+  it("registers a prompt handler", () => {
+    const harness = createTestHarness();
+    const handler = vi.fn(async () => ({
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: "Hello" } }],
+    }));
+
+    harness.registerPrompt("greeting", handler);
+
+    expect(harness.listPrompts()).toContain("greeting");
+  });
+
+  it("allows getting registered prompt", async () => {
+    const harness = createTestHarness();
+    const handler = vi.fn(async () => ({
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: "Prompt content" } }],
+    }));
+
+    harness.registerPrompt("test-prompt", handler);
+
+    const result = await harness.getPrompt("test-prompt", {});
+    expect(handler).toHaveBeenCalled();
+    expect(result.messages).toHaveLength(1);
+  });
+});

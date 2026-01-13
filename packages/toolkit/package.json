@@ -53,6 +53,7 @@
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
+    "@mcp-toolkit/testing": "workspace:*",
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
     "@types/node": "^22.10.5",

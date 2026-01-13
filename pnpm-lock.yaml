@@ -223,6 +223,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.1(zod@3.25.76)
     devDependencies:
+      '@mcp-toolkit/testing':
+        specifier: workspace:*
+        version: link:../testing
       '@mcp-toolkit/typescript-config':
         specifier: workspace:*
         version: link:../shared/typescript

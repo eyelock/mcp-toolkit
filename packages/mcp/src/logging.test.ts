@@ -11,9 +11,11 @@ import {
   StderrTransport,
   configureLogger,
   getLogger,
+  logCritical,
   logDebug,
   logError,
   logInfo,
+  logNotice,
   logResourceAccess,
   logServerEvent,
   logToolRequest,
@@ -219,6 +221,22 @@ describe("Logging", () => {
       expect(output.level).toBe("error");
       expect(output.error.message).toBe("Test");
     });
+
+    it("logNotice should log at notice level", () => {
+      logNotice("Notice message");
+      expect(consoleSpy).toHaveBeenCalled();
+      const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+      expect(output.level).toBe("notice");
+    });
+
+    it("logCritical should log at critical level with error details", () => {
+      const error = new Error("Critical failure");
+      logCritical("Critical error", error);
+      expect(consoleSpy).toHaveBeenCalled();
+      const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+      expect(output.level).toBe("critical");
+      expect(output.error.message).toBe("Critical failure");
+    });
   });
 
   describe("Specialized logging functions", () => {
@@ -261,6 +279,17 @@ describe("Logging", () => {
       expect(output.logger).toBe("resources");
     });
 
+    it("logResourceAccess should include error details when provided", () => {
+      const error = new Error("Resource not found");
+      error.name = "NotFoundError";
+      logResourceAccess("session://missing", false, 10, { error });
+
+      const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+      expect(output.level).toBe("error");
+      expect(output.error.message).toBe("Resource not found");
+      expect(output.error.name).toBe("NotFoundError");
+    });
+
     it("logServerEvent should include event type", () => {
       logServerEvent("startup", "Server started successfully");
 
@@ -268,6 +297,17 @@ describe("Logging", () => {
       expect(output.message).toBe("Server started successfully");
       expect(output.metadata.event).toBe("startup");
       expect(output.logger).toBe("server");
+    });
+
+    it("logServerEvent should include error details when provided", () => {
+      const error = new Error("Server failed");
+      error.name = "ServerError";
+      logServerEvent("error", "Server crashed", { error });
+
+      const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+      expect(output.level).toBe("error");
+      expect(output.error.message).toBe("Server failed");
+      expect(output.error.name).toBe("ServerError");
     });
   });
 

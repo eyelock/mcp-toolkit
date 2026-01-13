@@ -5,6 +5,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   type SessionStateTracker,
+  SessionStateTracker as SessionStateTrackerClass,
   createSessionStateTracker,
   createBlockingResponse,
   WorkflowViolationError,
@@ -152,6 +153,30 @@ describe("createSessionStateTracker", () => {
     const tracker = createSessionStateTracker("session_init", ["protected_tool"]);
     const result = tracker.checkToolAllowed("protected_tool");
     expect(result).toContain("requires session initialization");
+  });
+});
+
+describe("Custom transition triggers", () => {
+  it("handles custom transitions that are not initialized", () => {
+    // Create tracker with custom transition from initialized to ready
+    const tracker = new SessionStateTrackerClass({
+      initTools: new Set(["session_init"]),
+      requiresInit: new Set(),
+      transitionTriggers: new Map([
+        ["session_init", "initialized"],
+        ["activate_tool", "ready"], // Custom transition from initialized to ready
+      ]),
+    });
+
+    // First, initialize
+    tracker.recordToolCall("session_init");
+    expect(tracker.getState()).toBe("initialized");
+
+    // Then trigger custom transition (initialized -> ready)
+    const result = tracker.recordToolCall("activate_tool");
+    expect(result.transitioned).toBe(true);
+    expect(result.newState).toBe("ready");
+    expect(result.guidance).toBeUndefined(); // Custom transitions don't have built-in guidance
   });
 });
 

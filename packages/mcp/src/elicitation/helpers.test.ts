@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
   DEFAULT_ELICITATION_TIMEOUT_MS,
+  ElicitationDeclinedError,
   ElicitationNotSupportedError,
+  ElicitationValidationError,
   clientSupportsElicitation,
   elicitChoice,
   elicitConfirmation,
@@ -379,6 +381,22 @@ describe("Elicitation Helpers", () => {
         }),
         expect.any(Object)
       );
+    });
+  });
+
+  describe("Error classes", () => {
+    it("ElicitationDeclinedError should have correct name", () => {
+      const error = new ElicitationDeclinedError("User declined");
+      expect(error.name).toBe("ElicitationDeclinedError");
+      expect(error.message).toBe("User declined");
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it("ElicitationValidationError should have correct name", () => {
+      const error = new ElicitationValidationError("Invalid input");
+      expect(error.name).toBe("ElicitationValidationError");
+      expect(error.message).toBe("Invalid input");
+      expect(error).toBeInstanceOf(Error);
     });
   });
 });

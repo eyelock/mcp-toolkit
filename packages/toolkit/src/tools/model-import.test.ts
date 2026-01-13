@@ -423,6 +423,7 @@ describe("handleModelImport", () => {
     it("rejects unknown source type", async () => {
       await setupModel();
       // Force an invalid source type through
+      // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input handling
       const result = await handleModelImport({ source: "unknown" as any, content: "test" }, {});
 
       expect(result.isError).toBe(true);

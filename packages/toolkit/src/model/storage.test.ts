@@ -331,6 +331,7 @@ describe("ToolkitStorage", () => {
     });
 
     it("fails to save invalid state", () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input handling
       const result = storage.saveState({ phase: "invalid-phase" as any } as any);
 
       expect(result.success).toBe(false);

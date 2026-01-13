@@ -142,8 +142,8 @@ function parseText(content: string): EntityDefinition[] {
   const patterns = [/(\w+)\s+(?:has|contains|includes)\s+(.+)/gi, /(\w+):\s*(.+)/gi];
 
   for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
+    let match: RegExpExecArray | null = pattern.exec(content);
+    while (match !== null) {
       const entityName = match[1];
       const propsText = match[2];
       if (!entityName || !propsText) continue;
@@ -168,6 +168,7 @@ function parseText(content: string): EntityDefinition[] {
           tags: ["imported", "text"],
         });
       }
+      match = pattern.exec(content);
     }
   }
 
@@ -325,7 +326,7 @@ export async function handleModelImport(args: unknown, _context: unknown): Promi
     }
 
     const summary = [
-      `Import complete!`,
+      "Import complete!",
       "",
       `- Added: ${addedCount} entities`,
       skippedCount > 0 ? `- Skipped (already exist): ${skippedCount}` : null,

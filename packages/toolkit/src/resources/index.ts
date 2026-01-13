@@ -56,7 +56,7 @@ export async function handleToolkitResourceRead(uri: string): Promise<ReadResour
 
   // Check templated resources
   const templatesMatch = uri.match(/^toolkit:\/\/templates\/(.+)$/);
-  if (templatesMatch && templatesMatch[1]) {
+  if (templatesMatch?.[1]) {
     const type = templatesMatch[1];
     const result = await readTemplateResource(type);
     if (result) return result;
@@ -81,7 +81,7 @@ export async function handleToolkitResourceRead(uri: string): Promise<ReadResour
   }
 
   const clientsMatch = uri.match(/^toolkit:\/\/clients\/(.+)\/config$/);
-  if (clientsMatch && clientsMatch[1]) {
+  if (clientsMatch?.[1]) {
     const clientName = clientsMatch[1];
     const result = await readClientConfigResource(clientName);
     if (result) return result;

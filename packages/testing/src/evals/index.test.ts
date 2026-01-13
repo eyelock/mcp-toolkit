@@ -1374,9 +1374,7 @@ describe("Cancellation and Error Handling", () => {
         name: "invalid-json",
         prompt: "test",
         toolCalls: [{ tool: "test_tool", arguments: {} }],
-        assertions: [
-          { type: "llm-judge", criteria: "Is it good?", weight: 1 },
-        ],
+        assertions: [{ type: "llm-judge", criteria: "Is it good?", weight: 1 }],
         tags: [],
         scoring: { passCriteria: "all-assertions", threshold: 0.5 },
         timeoutMs: 60000,
@@ -1408,9 +1406,7 @@ describe("Cancellation and Error Handling", () => {
         name: "malformed-json",
         prompt: "test",
         toolCalls: [{ tool: "test_tool", arguments: {} }],
-        assertions: [
-          { type: "llm-judge", criteria: "Is it good?", weight: 1 },
-        ],
+        assertions: [{ type: "llm-judge", criteria: "Is it good?", weight: 1 }],
         tags: [],
         scoring: { passCriteria: "all-assertions", threshold: 0.5 },
         timeoutMs: 60000,

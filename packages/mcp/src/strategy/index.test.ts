@@ -328,13 +328,10 @@ describe("Tool Delegation", () => {
       const localFn = async () => ({ result: "local" });
       const delegateFn = async () => ({ result: "delegated" });
 
-      const result = await executeWithDelegation(
-        mockServerWithSampling,
-        {},
-        delegateFn,
-        localFn,
-        { mode: "local-only", toolName: "test_tool" }
-      );
+      const result = await executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+        mode: "local-only",
+        toolName: "test_tool",
+      });
 
       expect(result.outcome).toBe("local");
       expect(result.result).toEqual({ result: "local" });
@@ -345,13 +342,10 @@ describe("Tool Delegation", () => {
       const delegateFn = async () => ({ result: "delegated" });
 
       await expect(
-        executeWithDelegation(
-          mockServerWithoutSampling,
-          {},
-          delegateFn,
-          localFn,
-          { mode: "delegate-only", toolName: "test_tool" }
-        )
+        executeWithDelegation(mockServerWithoutSampling, {}, delegateFn, localFn, {
+          mode: "delegate-only",
+          toolName: "test_tool",
+        })
       ).rejects.toThrow(DelegationUnavailableError);
     });
 
@@ -359,13 +353,10 @@ describe("Tool Delegation", () => {
       const localFn = async () => ({ result: "local" });
       const delegateFn = async () => ({ result: "delegated" });
 
-      const result = await executeWithDelegation(
-        mockServerWithSampling,
-        {},
-        delegateFn,
-        localFn,
-        { mode: "delegate-only", toolName: "test_tool" }
-      );
+      const result = await executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+        mode: "delegate-only",
+        toolName: "test_tool",
+      });
 
       expect(result.outcome).toBe("delegated");
       expect(result.result).toEqual({ result: "delegated" });
@@ -378,13 +369,11 @@ describe("Tool Delegation", () => {
       };
 
       await expect(
-        executeWithDelegation(
-          mockServerWithSampling,
-          {},
-          delegateFn,
-          localFn,
-          { mode: "delegate-first", fallbackEnabled: false, toolName: "test_tool" }
-        )
+        executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+          mode: "delegate-first",
+          fallbackEnabled: false,
+          toolName: "test_tool",
+        })
       ).rejects.toThrow(ExecutionStrategyError);
     });
 
@@ -392,13 +381,10 @@ describe("Tool Delegation", () => {
       const localFn = async () => ({ result: "local" });
       const delegateFn = async () => ({ result: "delegated-success" });
 
-      const result = await executeWithDelegation(
-        mockServerWithSampling,
-        {},
-        delegateFn,
-        localFn,
-        { mode: "delegate-first", toolName: "test_tool" }
-      );
+      const result = await executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+        mode: "delegate-first",
+        toolName: "test_tool",
+      });
 
       expect(result.outcome).toBe("delegated");
       expect(result.result).toEqual({ result: "delegated-success" });
@@ -411,13 +397,11 @@ describe("Tool Delegation", () => {
         throw new Error("Delegation error");
       };
 
-      const result = await executeWithDelegation(
-        mockServerWithSampling,
-        {},
-        delegateFn,
-        localFn,
-        { mode: "delegate-first", fallbackEnabled: true, toolName: "test_tool" }
-      );
+      const result = await executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+        mode: "delegate-first",
+        fallbackEnabled: true,
+        toolName: "test_tool",
+      });
 
       expect(result.outcome).toBe("fallback-local");
       expect(result.result).toEqual({ result: "local-fallback" });
@@ -433,13 +417,11 @@ describe("Tool Delegation", () => {
       };
 
       await expect(
-        executeWithDelegation(
-          mockServerWithSampling,
-          {},
-          delegateFn,
-          localFn,
-          { mode: "delegate-first", fallbackEnabled: true, toolName: "test_tool" }
-        )
+        executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+          mode: "delegate-first",
+          fallbackEnabled: true,
+          toolName: "test_tool",
+        })
       ).rejects.toThrow(ExecutionStrategyError);
     });
 
@@ -466,13 +448,10 @@ describe("Tool Delegation", () => {
       const delegateFn = async () => ({ result: "delegated" });
 
       await expect(
-        executeWithDelegation(
-          mockServerWithSampling,
-          {},
-          delegateFn,
-          localFn,
-          { mode: "local-only", toolName: "test_tool" }
-        )
+        executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+          mode: "local-only",
+          toolName: "test_tool",
+        })
       ).rejects.toThrow(ExecutionStrategyError);
     });
 
@@ -483,13 +462,10 @@ describe("Tool Delegation", () => {
       };
 
       await expect(
-        executeWithDelegation(
-          mockServerWithSampling,
-          {},
-          delegateFn,
-          localFn,
-          { mode: "delegate-only", toolName: "test_tool" }
-        )
+        executeWithDelegation(mockServerWithSampling, {}, delegateFn, localFn, {
+          mode: "delegate-only",
+          toolName: "test_tool",
+        })
       ).rejects.toThrow(ExecutionStrategyError);
     });
   });

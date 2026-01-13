@@ -5,11 +5,11 @@
  * invocation flow, session tracking, and hook execution.
  */
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { createMemoryProvider } from "@mcp-toolkit/core";
 import type { SessionProvider } from "@mcp-toolkit/core";
 import { createServer, getSessionStartHooks, getSessionEndHooks } from "./server.js";
-import type { ServerConfig, ServerContext } from "./server.js";
+import type { ServerConfig } from "./server.js";
 import { handleToolCall, registerTools } from "./tools/index.js";
 import { registerResources, handleResourceRead } from "./resources/index.js";
 import { registerPrompts, handleGetPrompt } from "./prompts/index.js";
@@ -113,11 +113,7 @@ describe("MCP Server Integration Tests", () => {
     it("invokes session_init tool successfully", async () => {
       const { context } = createServer({ provider });
 
-      const result = await handleToolCall(
-        "session_init",
-        { projectName: "test-project" },
-        context
-      );
+      const result = await handleToolCall("session_init", { projectName: "test-project" }, context);
 
       expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toContain("success");
@@ -446,9 +442,9 @@ describe("MCP Server Integration Tests", () => {
       ]);
 
       // All should succeed
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result.isError).toBeUndefined();
-      });
+      }
     });
 
     it("maintains session state during concurrent operations", async () => {
@@ -466,9 +462,9 @@ describe("MCP Server Integration Tests", () => {
       const results = await Promise.all(operations);
 
       // All operations should complete
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result).toBeDefined();
-      });
+      }
     });
   });
 });

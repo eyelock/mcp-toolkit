@@ -384,7 +384,9 @@ describe("registerPrompt", () => {
   it("allows getting registered prompt", async () => {
     const harness = createTestHarness();
     const handler = vi.fn(async () => ({
-      messages: [{ role: "user" as const, content: { type: "text" as const, text: "Prompt content" } }],
+      messages: [
+        { role: "user" as const, content: { type: "text" as const, text: "Prompt content" } },
+      ],
     }));
 
     harness.registerPrompt("test-prompt", handler);

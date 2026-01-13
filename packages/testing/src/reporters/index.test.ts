@@ -473,7 +473,6 @@ describe("Reporter Edge Cases", () => {
     });
 
     it("markdown formats 100% score correctly", () => {
-      const output = perfectScoreResult.score;
       const formatted = markdownReporter.formatResult(perfectScoreResult);
       expect(formatted).toContain("100.0%");
     });
@@ -497,7 +496,7 @@ describe("Reporter Edge Cases", () => {
 
   describe("Special Characters", () => {
     const specialCharsResult: EvalResult = {
-      scenario: 'Test with "quotes" & <brackets> and \'apostrophes\'',
+      scenario: "Test with \"quotes\" & <brackets> and 'apostrophes'",
       passed: true,
       score: 0.8,
       durationMs: 100,

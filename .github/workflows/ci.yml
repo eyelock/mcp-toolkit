@@ -3,8 +3,32 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      # Source code and package configs
+      - 'packages/**'
+      # Dependencies
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      # Build and lint config
+      - 'biome.json'
+      - 'turbo.json'
+      # Workflow changes should test themselves
+      - '.github/workflows/**'
   pull_request:
     branches: [main]
+    paths:
+      # Source code and package configs
+      - 'packages/**'
+      # Dependencies
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      # Build and lint config
+      - 'biome.json'
+      - 'turbo.json'
+      # Workflow changes should test themselves
+      - '.github/workflows/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,7 +73,7 @@ jobs:
         run: pnpm build
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm check
 
       - name: Type Check
         run: pnpm typecheck

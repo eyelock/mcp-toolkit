@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      # Only run release on actual code/dependency changes
+      # Documentation-only changes don't need releases
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.changeset/**'
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 

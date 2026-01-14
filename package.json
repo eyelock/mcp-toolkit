@@ -27,7 +27,7 @@
     "@changesets/changelog-github": "^0.5.2",
     "@changesets/cli": "^2.29.8",
     "@modelcontextprotocol/inspector": "^0.18.0",
-    "turbo": "^2.3.3",
+    "turbo": "^2.7.4",
     "typescript": "^5.7.2"
   },
   "engines": {

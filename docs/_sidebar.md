@@ -1,4 +1,5 @@
 - [Home](/)
+- [Getting Started](getting-started.md)
 - [MCP Reference](mcp-reference.md)
 - [Hooks System](hooks.md)
 - [Tool Delegation](tool-delegation.md)

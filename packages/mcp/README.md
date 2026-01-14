@@ -155,11 +155,21 @@ pnpm start:http     # Run in HTTP mode
 
 ```typescript
 // Main entry - server factory and transports
-import { createServer, startStdioTransport, startHttpTransport } from "@mcp-toolkit/mcp";
+import {
+  createServer,
+  createStdioTransport,
+  createHttpTransport,
+} from "@mcp-toolkit/mcp";
 
 // Server subpath
 import { createServer, type ServerContext } from "@mcp-toolkit/mcp/server";
 
-// Hooks subpath
-import { mcpHooks } from "@mcp-toolkit/mcp/hooks";
+// Hooks subpath - session and action hooks
+import { loadCoreHooks, coreHookDefinitions } from "@mcp-toolkit/mcp/hooks";
+
+// MCP spec implementations are also exported from main entry:
+// - Logging: createMcpLogger, logDebug, logInfo, logWarning, logError
+// - Progress: createProgressReporter, ProgressReporter
+// - Cancellation: CancellationMonitor
+// - Pagination: paginateArray, calculatePagination
 ```

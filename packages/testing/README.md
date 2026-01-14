@@ -22,22 +22,23 @@ pnpm add @mcp-toolkit/testing
 Test MCP tools without running a full server:
 
 ```typescript
-import { McpTestHarness } from "@mcp-toolkit/testing/harness";
+import { createTestHarness, assertToolResult } from "@mcp-toolkit/testing/harness";
 
 describe("my tool", () => {
-  let harness: McpTestHarness;
-
-  beforeEach(() => {
-    harness = new McpTestHarness();
+  const harness = createTestHarness({
+    tools: {
+      my_tool: async (args) => ({
+        content: [{ type: "text", text: `Query: ${args.query}` }],
+      }),
+    },
   });
 
   it("should handle valid input", async () => {
-    const result = await harness.callTool("my_tool", {
+    const { result } = await harness.callTool("my_tool", {
       query: "test query",
     });
 
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toContain("test");
+    assertToolResult(result, { contentContains: "test" });
   });
 });
 ```
@@ -47,32 +48,35 @@ describe("my tool", () => {
 Run evaluations against tool implementations:
 
 ```typescript
-import { EvalRunner, createMockLLMClient } from "@mcp-toolkit/testing/evals";
+import { createEvalRunner, createMockLLMClient } from "@mcp-toolkit/testing/evals";
+import { createTestHarness } from "@mcp-toolkit/testing/harness";
 
-const runner = new EvalRunner({
-  client: createMockLLMClient([
+const runner = createEvalRunner({
+  harness: createTestHarness({ tools: myTools }),
+  llmClient: createMockLLMClient([
     { content: "Expected response" },
   ]),
 });
 
-const results = await runner.run([
-  {
-    name: "basic test",
-    input: { query: "test" },
-    expectedOutput: "Expected response",
-  },
-]);
+const result = await runner.runScenario({
+  name: "basic test",
+  prompt: "Test the tool",
+  toolCalls: [{ tool: "my_tool", arguments: {} }],
+  assertions: [{ type: "tool-called", tool: "my_tool" }],
+});
 ```
 
 ### Judge System
 
-Automatically assess response quality:
+LLM-as-Judge for automated response quality assessment:
 
 ```typescript
-import { ResponseJudge } from "@mcp-toolkit/testing/judge";
+import { createLLMJudge, PRESET_RUBRICS } from "@mcp-toolkit/testing/judge";
+import { createAnthropicClient } from "@mcp-toolkit/testing/evals";
 
-const judge = new ResponseJudge({
-  criteria: ["accuracy", "completeness", "relevance"],
+const judge = createLLMJudge({
+  llmClient: createAnthropicClient({ model: "claude-sonnet-4-20250514" }),
+  rubric: PRESET_RUBRICS.correctness,
 });
 
 const verdict = await judge.evaluate({
@@ -87,55 +91,48 @@ console.log(verdict.feedback); // Detailed feedback
 
 ### Reporters
 
-Generate structured test reports:
+Generate structured test reports in multiple formats:
 
 ```typescript
-import { TestReporter } from "@mcp-toolkit/testing/reporters";
+import { getReporter, formatResult } from "@mcp-toolkit/testing/reporters";
 
-const reporter = new TestReporter();
+const reporter = getReporter("markdown"); // or "json", "html", "console"
 
-reporter.addResult({
-  name: "test-1",
-  passed: true,
-  duration: 100,
-});
+const evalResult = { /* from runner.runScenario() */ };
+const output = reporter(evalResult);
+console.log(output);
 
-const report = reporter.generate();
-console.log(report.summary);
-console.log(report.details);
+// Or format individual results
+const formatted = formatResult(evalResult, "markdown");
 ```
 
 ## API Reference
 
-### McpTestHarness
+### TestHarness
 
 ```typescript
-class McpTestHarness {
-  // Call a tool with arguments
-  callTool(name: string, args: unknown): Promise<CallToolResult>;
-
-  // Read a resource
-  readResource(uri: string): Promise<ReadResourceResult>;
-
-  // Get a prompt
-  getPrompt(name: string, args: Record<string, string>): Promise<GetPromptResult>;
-
-  // Register custom tools for testing
-  registerTool(tool: Tool, handler: ToolHandler): void;
+interface TestHarnessConfig {
+  tools?: Record<string, ToolHandler>;
+  resources?: Record<string, ResourceHandler>;
+  prompts?: Record<string, PromptHandler>;
 }
+
+const harness = createTestHarness(config);
+const { result } = await harness.callTool(name, args);
 ```
 
 ### EvalRunner
 
 ```typescript
-class EvalRunner {
-  constructor(config: {
-    client: LLMClient;
-    timeout?: number;
-  });
-
-  run(cases: EvalCase[]): Promise<EvalResult[]>;
+interface EvalRunnerConfig {
+  harness: TestHarness;
+  llmClient: LLMClient;
+  timeout?: number;
 }
+
+const runner = createEvalRunner(config);
+const result = await runner.runScenario(scenario);
+const results = await runner.runSuite(suite);
 ```
 
 ### LLM Clients
@@ -168,12 +165,16 @@ pnpm typecheck      # Type check
 ## Exports
 
 ```typescript
-// Main entry
-import { McpTestHarness, EvalRunner, ResponseJudge } from "@mcp-toolkit/testing";
+// Main entry - everything re-exported
+import {
+  createTestHarness,
+  createEvalRunner,
+  createLLMJudge,
+} from "@mcp-toolkit/testing";
 
 // Subpath exports
-import { McpTestHarness } from "@mcp-toolkit/testing/harness";
-import { EvalRunner, createMockLLMClient } from "@mcp-toolkit/testing/evals";
-import { ResponseJudge } from "@mcp-toolkit/testing/judge";
-import { TestReporter } from "@mcp-toolkit/testing/reporters";
+import { TestHarness, createTestHarness, assertToolResult } from "@mcp-toolkit/testing/harness";
+import { EvalRunner, createEvalRunner, createMockLLMClient, createAnthropicClient } from "@mcp-toolkit/testing/evals";
+import { LLMJudge, createLLMJudge, PRESET_RUBRICS } from "@mcp-toolkit/testing/judge";
+import { getReporter, formatResult, jsonReporter, markdownReporter } from "@mcp-toolkit/testing/reporters";
 ```

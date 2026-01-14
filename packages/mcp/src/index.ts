@@ -19,6 +19,7 @@
  *   MCP_TAGS - Comma-separated tags (e.g., "env=development,team=platform")
  */
 
+import { createRequire } from "node:module";
 import type { ServerTags } from "@mcp-toolkit/model";
 import { createServer } from "./server.js";
 import {
@@ -33,7 +34,10 @@ import {
 // Change this value when setting up your MCP server project.
 // This canonical name identifies this server across all installations.
 const CANONICAL_NAME = "mcp-toolkit";
-const VERSION = "0.0.0";
+
+// Read version from package.json
+const require = createRequire(import.meta.url);
+const { version: VERSION } = require("../package.json") as { version: string };
 
 /**
  * Parse tags from CLI arguments and environment variable.

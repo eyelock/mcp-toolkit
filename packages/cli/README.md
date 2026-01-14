@@ -36,11 +36,20 @@ node bin/run.js --help
 Initialize a new project configuration:
 
 ```bash
-mcp-toolkit-cli init --name my-project
+mcp-toolkit-cli init my-project
+mcp-toolkit-cli init my-project --all-features
+mcp-toolkit-cli init my-project --no-tools --prompts
 ```
 
-Options:
-- `--name, -n`: Project name (kebab-case)
+Arguments:
+- `projectName`: Project name (kebab-case, required)
+
+Flags:
+- `--tools / --no-tools`: Enable/disable tools (default: enabled)
+- `--resources / --no-resources`: Enable/disable resources (default: enabled)
+- `--prompts / --no-prompts`: Enable/disable prompts (default: disabled)
+- `--sampling / --no-sampling`: Enable/disable sampling (default: disabled)
+- `--all-features`: Enable all features
 
 ### Status Command
 

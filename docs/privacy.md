@@ -159,10 +159,10 @@ const server = createServer({
 });
 ```
 
-## Related Configuration
+## Related Documentation
 
 - [Tool Delegation](./tool-delegation.md) - Full delegation system documentation
-- [Session Management](./sessions.md) - Session lifecycle and storage
+- [MCP Reference](./mcp-reference.md) - Session and storage patterns
 
 ## Questions?
 

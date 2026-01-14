@@ -178,6 +178,6 @@ MCP Toolkit will continue to function normally.
 
 ## Related Packages
 
-- `@mcp-toolkit/core` - Hook system, registry, loader, composer
+- `@mcp-toolkit/core` - Hook system, registry, loader, composer, storage
 - `@mcp-toolkit/mcp` - MCP server implementation
-- `@mcp-toolkit/storage` - Session persistence
+- `@mcp-toolkit/model` - Zod schemas

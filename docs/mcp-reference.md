@@ -502,14 +502,14 @@ const jsonSchema = zodToJsonSchema(SessionInitInputSchema);
 
 ---
 
-## Provider Package
+## Storage Module
 
-**Implementation**: `packages/storage/src/`
+**Implementation**: `packages/core/src/storage/`
 
-Session persistence abstraction.
+Session persistence abstraction, part of `@mcp-toolkit/core`.
 
 ```typescript
-import { createMemoryProvider } from "@mcp-toolkit/storage";
+import { createMemoryProvider } from "@mcp-toolkit/core";
 
 const provider = createMemoryProvider();
 
@@ -552,8 +552,9 @@ packages/
 │   ├── schema.ts        # Core session/identity schemas
 │   ├── strategy.ts      # Delegation mode schemas
 │   └── index.ts         # Exports
-├── provider/src/        # Session persistence
-│   └── memory.ts        # In-memory provider
+├── core/src/            # Hook system and storage
+│   ├── hooks/           # Hook registry, loader, composer
+│   └── storage/         # Session persistence (MemoryProvider)
 ├── mcp/src/             # MCP server implementation
 │   ├── server.ts        # Server setup & context
 │   ├── tools/           # Tool definitions & handlers

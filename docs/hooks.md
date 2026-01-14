@@ -8,13 +8,13 @@ The hooks system helps you implement several parts of the [MCP Specification](ht
 
 | MCP Feature | How Hooks Help | Spec Version | Spec Link |
 |-------------|----------------|--------------|-----------|
-| **Prompts** | Hooks compose into `role=assistant` prompts that guide the LLM | 2025-03-26 | [Prompts](https://modelcontextprotocol.io/specification/2025-03-26/server/prompts) |
-| **Tools** | Hooks are registered and triggered via dedicated tools | 2025-03-26 | [Tools](https://modelcontextprotocol.io/specification/2025-03-26/server/tools) |
-| **Sampling** | Action hooks can direct the LLM to make sampling requests | 2025-03-26 | [Sampling](https://modelcontextprotocol.io/specification/2025-03-26/client/sampling) |
-| **Progress** | `lifecycle: "progress"` hooks fire during long-running operations | 2025-03-26 | [Progress](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress) |
-| **Cancellation** | `lifecycle: "cancel"` hooks provide cleanup guidance when requests are cancelled | 2025-03-26 | [Cancellation](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/cancellation) |
-| **Completion** | Composed hooks can suggest probable next actions as completion hints | 2025-03-26 | [Completion](https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/completion) |
-| **Logging** | Hook failures and transparency notices sent via MCP logging | 2025-03-26 | [Logging](https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/logging) |
+| **Prompts** | Hooks compose into `role=assistant` prompts that guide the LLM | 2025-06-18 | [Prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts) |
+| **Tools** | Hooks are registered and triggered via dedicated tools | 2025-06-18 | [Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) |
+| **Sampling** | Action hooks can direct the LLM to make sampling requests | 2025-06-18 | [Sampling](https://modelcontextprotocol.io/specification/2025-06-18/client/sampling) |
+| **Progress** | `lifecycle: "progress"` hooks fire during long-running operations | 2025-06-18 | [Progress](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress) |
+| **Cancellation** | `lifecycle: "cancel"` hooks provide cleanup guidance when requests are cancelled | 2025-06-18 | [Cancellation](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation) |
+| **Completion** | Composed hooks can suggest probable next actions as completion hints | 2025-06-18 | [Completion](https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/completion) |
+| **Logging** | Hook failures and transparency notices sent via MCP logging | 2025-06-18 | [Logging](https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging) |
 
 ---
 
@@ -118,8 +118,8 @@ get id(): string {
 |-------|------|---------------|
 | `start` | Process begins | - |
 | `running` | During execution | Tied to `requestId` |
-| `progress` | Progress update | [MCP Progress](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress) |
-| `cancel` | Cancellation requested | [MCP Cancellation](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/cancellation) |
+| `progress` | Progress update | [MCP Progress](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress) |
+| `cancel` | Cancellation requested | [MCP Cancellation](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation) |
 | `end` | Process complete | - |
 
 ### Requirement Levels (RFC 2119)
@@ -184,7 +184,7 @@ Start by reviewing the available tools with `server_info`.
 ### Failure Handling
 
 If content cannot be loaded (file missing, read error), the loader:
-1. Logs an error via [MCP Logging](https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/logging) at `error` level
+1. Logs an error via [MCP Logging](https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging) at `error` level
 2. Continues without the hook (graceful degradation)
 3. Includes the failure in composer transparency (see below)
 
@@ -374,8 +374,8 @@ This enables:
 - Request-specific context injection
 
 See:
-- [MCP Cancellation](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/cancellation)
-- [MCP Progress](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress)
+- [MCP Cancellation](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation)
+- [MCP Progress](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress)
 
 ---
 
@@ -505,6 +505,6 @@ interface HookDefinitionWithId extends HookDefinition {
 
 - [Tool Delegation](./tool-delegation.md) - How action hooks connect to delegation
 - [MCP Reference](./mcp-reference.md) - Full MCP implementation reference
-- [MCP Cancellation Spec](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/cancellation)
-- [MCP Progress Spec](https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress)
+- [MCP Cancellation Spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation)
+- [MCP Progress Spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress)
 - [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) - Requirement level definitions

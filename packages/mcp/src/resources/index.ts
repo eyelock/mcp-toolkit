@@ -1,7 +1,7 @@
 /**
  * Resources Registration
  *
- * Central registry for all MCP resources and resource templates.
+ * Central registry for all MCP resources and resource templates, including toolkit resources.
  *
  * ## Resources vs Resource Templates
  *
@@ -14,6 +14,7 @@
  * @see https://modelcontextprotocol.io/specification/2025-06-18/server/resources
  */
 
+import { getToolkitComponents, getToolkitHandlers } from "@mcp-toolkit/toolkit";
 import type {
   ReadResourceResult,
   Resource,
@@ -26,48 +27,61 @@ import { handleTemplatedResourceRead, registerResourceTemplates } from "./templa
 // Re-export templates module
 export * from "./templates.js";
 
-/**
- * All available static resources
- */
-const resources: Resource[] = [sessionResource];
+// Get toolkit components and handlers
+const toolkitComponents = getToolkitComponents();
+const toolkitHandlers = getToolkitHandlers();
 
 /**
- * Resource readers mapped by URI
+ * All core static resources
  */
-const readers: Record<string, (context: ServerContext) => Promise<ReadResourceResult>> = {
+const coreResources: Resource[] = [sessionResource];
+
+/**
+ * Resource readers mapped by URI (core resources only)
+ */
+const coreReaders: Record<string, (context: ServerContext) => Promise<ReadResourceResult>> = {
   [SESSION_RESOURCE_URI]: readSessionResource,
 };
 
 /**
- * Register all static resources
+ * Register all static resources (core + toolkit)
  */
 export function registerResources(): Resource[] {
-  return resources;
+  return [...coreResources, ...toolkitComponents.resources];
 }
 
 /**
- * Register all resource templates
+ * Register all resource templates (core + toolkit)
  */
 export function getResourceTemplates(): ResourceTemplate[] {
-  return registerResourceTemplates();
+  return [...registerResourceTemplates(), ...toolkitComponents.resourceTemplates];
 }
 
 /**
  * Handle a resource read (static or templated)
  *
- * This function first checks static resources, then tries template matching.
+ * This function checks toolkit resources first, then core static resources,
+ * then tries template matching.
  */
 export async function handleResourceRead(
   uri: string,
   context: ServerContext
 ): Promise<ReadResourceResult> {
-  // First, check static resources
-  const reader = readers[uri];
+  // First check if it's a toolkit resource
+  if (toolkitHandlers.isToolkitResource(uri)) {
+    const result = await toolkitHandlers.handleResourceRead(uri);
+    if (result) {
+      return result;
+    }
+  }
+
+  // Then check core static resources
+  const reader = coreReaders[uri];
   if (reader) {
     return reader(context);
   }
 
-  // Then, try templated resources
+  // Then try templated resources
   const templatedResult = await handleTemplatedResourceRead(uri, context);
   if (templatedResult) {
     return templatedResult;

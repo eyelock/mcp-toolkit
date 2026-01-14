@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { HookRegistry } from "@mcp-toolkit/core";
-import { type WorkflowStateTracker, createWorkflowStateTracker } from "@mcp-toolkit/mcp";
+import {
+  HookRegistry,
+  type WorkflowStateTracker,
+  createWorkflowStateTracker,
+} from "@mcp-toolkit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CONFIG_HOOK_ID,

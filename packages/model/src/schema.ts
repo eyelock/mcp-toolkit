@@ -56,8 +56,8 @@ export const SessionFeaturesSchema = z
   .object({
     tools: z.boolean().default(true).describe("Enable MCP tools for this session"),
     resources: z.boolean().default(true).describe("Enable MCP resources for this session"),
-    prompts: z.boolean().default(false).describe("Enable MCP prompts for this session"),
-    sampling: z.boolean().default(false).describe("Enable MCP sampling for this session"),
+    prompts: z.boolean().default(true).describe("Enable MCP prompts for this session"),
+    sampling: z.boolean().default(true).describe("Enable MCP sampling for this session"),
   })
   .describe("MCP features to enable for the session");
 

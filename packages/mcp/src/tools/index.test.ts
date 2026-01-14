@@ -26,10 +26,11 @@ describe("Tools Registry", () => {
       const tools = registerTools();
 
       expect(Array.isArray(tools)).toBe(true);
-      expect(tools.length).toBe(5);
+      // Core tools (5) + toolkit tools
+      expect(tools.length).toBeGreaterThanOrEqual(5);
     });
 
-    it("includes all session tools", () => {
+    it("includes all core session tools", () => {
       const tools = registerTools();
       const toolNames = tools.map((t) => t.name);
 
@@ -38,6 +39,15 @@ describe("Tools Registry", () => {
       expect(toolNames).toContain("session_clear");
       expect(toolNames).toContain("session_status");
       expect(toolNames).toContain("server_info");
+    });
+
+    it("includes toolkit tools", () => {
+      const tools = registerTools();
+      const toolNames = tools.map((t) => t.name);
+
+      // Verify toolkit tools are included
+      const toolkitTools = toolNames.filter((name) => name.startsWith("toolkit:"));
+      expect(toolkitTools.length).toBeGreaterThan(0);
     });
 
     it("all tools have required properties", () => {

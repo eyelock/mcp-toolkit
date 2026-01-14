@@ -15,15 +15,25 @@ describe("Prompts Registry", () => {
       const prompts = registerPrompts();
 
       expect(Array.isArray(prompts)).toBe(true);
-      expect(prompts.length).toBe(2);
+      // Core prompts (2) + toolkit prompts
+      expect(prompts.length).toBeGreaterThanOrEqual(2);
     });
 
-    it("includes all prompts", () => {
+    it("includes all core prompts", () => {
       const prompts = registerPrompts();
       const promptNames = prompts.map((p) => p.name);
 
       expect(promptNames).toContain("welcome");
       expect(promptNames).toContain("session_setup");
+    });
+
+    it("includes toolkit prompts", () => {
+      const prompts = registerPrompts();
+      const promptNames = prompts.map((p) => p.name);
+
+      // Verify toolkit prompts are included
+      const toolkitPrompts = promptNames.filter((name) => name.startsWith("toolkit-"));
+      expect(toolkitPrompts.length).toBeGreaterThan(0);
     });
 
     it("all prompts have required properties", () => {

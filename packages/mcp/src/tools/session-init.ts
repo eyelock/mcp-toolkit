@@ -14,6 +14,7 @@ import {
   SessionFeaturesSchema,
   SessionInitInputSchema,
 } from "@mcp-toolkit/model";
+import { getToolkitComponents } from "@mcp-toolkit/toolkit";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -200,6 +201,13 @@ export async function handleSessionInit(
     }
   }
 
+  // Get toolkit guidance for next steps
+  const toolkitComponents = getToolkitComponents();
+  const toolkitPromptNames = toolkitComponents.prompts.map((p) => p.name);
+  const toolkitToolCount = toolkitComponents.tools.length;
+  const toolkitResourceCount =
+    toolkitComponents.resources.length + toolkitComponents.resourceTemplates.length;
+
   return {
     content: [
       {
@@ -213,6 +221,19 @@ export async function handleSessionInit(
           `Features: ${enabledFeatures.join(", ") || "none"}`,
           `Client: ${clientInfoDisplay}`,
           `Created: ${session.createdAt}`,
+          "",
+          "─────────────────────────────────────────────",
+          "Toolkit Onboarding",
+          "─────────────────────────────────────────────",
+          "",
+          "Ready to customize your MCP server! Available guided workflows:",
+          "",
+          "Prompts (use prompts/get or prompts/list):",
+          ...toolkitPromptNames.map((name) => `  • ${name}`),
+          "",
+          `Also available: ${toolkitToolCount} toolkit tools, ${toolkitResourceCount} resources`,
+          "",
+          "Start with: prompts/get toolkit-setup-guide",
         ].join("\n"),
       },
     ],

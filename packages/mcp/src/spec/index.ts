@@ -78,6 +78,7 @@ export {
 } from "./session-state.js";
 
 // Workflow State (Hook-based blocking)
+// Re-exported from @mcp-toolkit/core for backwards compatibility
 export {
   type HookCompletionStatus,
   type BlockingHookDef,
@@ -89,7 +90,7 @@ export {
   checkWorkflowAllowed,
   registerBlockingHook,
   markWorkflowHookCompleted,
-} from "./workflow-state.js";
+} from "@mcp-toolkit/core";
 
 // Logging
 export {

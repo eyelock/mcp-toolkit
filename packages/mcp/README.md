@@ -99,17 +99,27 @@ export async function readMyResource(): Promise<string> {
 
 ## MCP Specification Coverage
 
-| Feature | Status | Implementation |
-|---------|--------|----------------|
-| Tools | Full | `src/tools/` |
-| Resources | Full | `src/resources/` |
-| Prompts | Full | `src/prompts/` |
-| Sampling | Full | `src/sampling/` |
-| Elicitation | Full | `src/elicitation/` |
-| Logging | Full | `src/logging.ts` |
-| Progress | Full | `src/spec/progress.ts` |
-| Cancellation | Full | `src/spec/cancellation.ts` |
-| Pagination | Full | `src/pagination.ts` |
+| Feature | Spec | Status | Implementation |
+|---------|------|--------|----------------|
+| Tools | [spec][tools] | Full | `src/tools/` |
+| Resources | [spec][resources] | Full | `src/resources/` |
+| Prompts | [spec][prompts] | Full | `src/prompts/` |
+| Sampling | [spec][sampling] | Full | `src/sampling/` |
+| Elicitation | [spec][elicitation] | Full | `src/elicitation/` |
+| Logging | [spec][logging] | Full | `src/logging.ts` |
+| Progress | [spec][progress] | Full | `src/spec/progress.ts` |
+| Cancellation | [spec][cancellation] | Full | `src/spec/cancellation.ts` |
+| Pagination | [spec][pagination] | Full | `src/pagination.ts` |
+
+[tools]: https://modelcontextprotocol.io/specification/2025-03-26/server/tools
+[resources]: https://modelcontextprotocol.io/specification/2025-03-26/server/resources
+[prompts]: https://modelcontextprotocol.io/specification/2025-03-26/server/prompts
+[sampling]: https://modelcontextprotocol.io/specification/2025-03-26/client/sampling
+[elicitation]: https://modelcontextprotocol.io/docs/learn/client-concepts#elicitation
+[logging]: https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/logging
+[progress]: https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress
+[cancellation]: https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/cancellation
+[pagination]: https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/pagination
 
 ## Built-in Tools
 

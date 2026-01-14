@@ -1,5 +1,8 @@
 {
   "mcpServers": {
+    "termq": {
+      "command": "termqmcp"
+    },
     "mcp-toolkit-stdio": {
       "command": "node",
       "args": ["${MCP_TOOLKIT_PATH:-./packages/mcp/dist}/index.js", "--dev"],

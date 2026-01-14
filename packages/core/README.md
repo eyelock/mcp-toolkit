@@ -21,31 +21,34 @@ pnpm add @mcp-toolkit/core
 The hook system provides contextual guidance to LLMs at different lifecycle points.
 
 ```typescript
-import { HookRegistry, HookLoader, HookComposer } from "@mcp-toolkit/core";
+import {
+  createHookRegistry,
+  createContentLoader,
+  composeHooks,
+} from "@mcp-toolkit/core";
 
 // Create a registry
-const registry = new HookRegistry();
+const registry = createHookRegistry();
 
 // Register hooks
 registry.register({
-  id: "my-hook",
+  tag: "my-hook",
   name: "My Hook",
   type: "session",
   lifecycle: "start",
-  description: "Provides guidance at session start",
-  contentPath: "./hooks/my-hook.md",
+  requirementLevel: "SHOULD",
 });
 
-// Load hook content
-const loader = new HookLoader();
-const resolvedHooks = await loader.resolve(registry.getAll());
+// Query hooks for a specific context
+const hooks = registry.query({ type: "session", lifecycle: "start" });
 
-// Compose hooks for a specific context
-const composer = new HookComposer();
-const composed = composer.compose(resolvedHooks, {
-  type: "session",
-  lifecycle: "start",
-});
+// Load hook content from markdown files
+const loader = createContentLoader({ basePath: "./hooks" });
+const { resolved } = await loader.loadAll(hooks);
+
+// Compose hooks into a single output
+const result = composeHooks(resolved);
+console.log(result.content);
 ```
 
 ### Storage Interface
@@ -100,15 +103,14 @@ export class MyCustomProvider implements SessionProvider {
 
 ```typescript
 interface HookDefinition {
-  id: string;           // Unique identifier
-  name: string;         // Display name
-  type: HookType;       // config | session | action
-  lifecycle: HookLifecycle;  // start | running | end
-  description: string;  // What this hook does
-  contentPath: string;  // Path to markdown content
-  blocking?: boolean;   // Block until complete
-  requirementLevel?: "MUST" | "SHOULD" | "MAY";
-  dependencies?: string[];  // Hook IDs that must complete first
+  tag: string;                // Unique identifier tag
+  name: string;               // Display name
+  type: HookType;             // config | session | action
+  lifecycle: HookLifecycle;   // start | running | end
+  requirementLevel: RequirementLevel;  // MUST | SHOULD | MAY
+  blocking?: boolean;         // Block until complete (default: false)
+  mcpFeatures?: McpFeature[]; // Related MCP features
+  dependencies?: string[];    // Hook tags that must complete first
 }
 ```
 
@@ -125,12 +127,31 @@ pnpm typecheck      # Type check
 ## Exports
 
 ```typescript
-// Main entry
-import { HookRegistry, HookLoader, HookComposer } from "@mcp-toolkit/core";
+// Main entry - everything re-exported
+import {
+  createHookRegistry,
+  createContentLoader,
+  composeHooks,
+  createMemoryProvider,
+} from "@mcp-toolkit/core";
 
 // Hooks subpath
-import { HookRegistry } from "@mcp-toolkit/core/hooks";
+import {
+  HookRegistry,
+  createHookRegistry,
+  HookContentLoader,
+  createContentLoader,
+  HookComposer,
+  createComposer,
+  composeHooks,
+  type HookDefinition,
+  type ResolvedHook,
+} from "@mcp-toolkit/core/hooks";
 
 // Storage subpath
-import { MemoryProvider, type SessionProvider } from "@mcp-toolkit/core/storage";
+import {
+  MemoryProvider,
+  createMemoryProvider,
+  type SessionProvider,
+} from "@mcp-toolkit/core/storage";
 ```

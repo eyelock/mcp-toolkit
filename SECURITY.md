@@ -4,8 +4,9 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| 0.x.x   | :white_check_mark: |
+
+> **Note**: This project is pre-1.0 and under active development. Security fixes will be applied to the latest version.
 
 ## Reporting a Vulnerability
 

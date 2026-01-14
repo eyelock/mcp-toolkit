@@ -122,13 +122,21 @@ export type SessionInitInput = z.infer<typeof SessionInitInputSchema>;
 export type SessionUpdateInput = z.infer<typeof SessionUpdateInputSchema>;
 
 // =============================================================================
-// Schema Metadata Helpers
+// Schema Conversion
 // =============================================================================
 
 /**
- * Extract JSON Schema from a Zod schema for MCP tool definitions
+ * Re-export zodToJsonSchema for convenience.
+ * Use this to convert Zod schemas to JSON Schema for MCP tool definitions.
+ *
+ * @example
+ * ```typescript
+ * import { zodToJsonSchema, SessionInitInputSchema } from "@mcp-toolkit/model";
+ *
+ * const tool: Tool = {
+ *   name: "session_init",
+ *   inputSchema: zodToJsonSchema(SessionInitInputSchema) as Tool["inputSchema"],
+ * };
+ * ```
  */
-export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  // Use zod-to-json-schema in production, simplified version here
-  return schema._def as unknown as Record<string, unknown>;
-}
+export { zodToJsonSchema } from "zod-to-json-schema";

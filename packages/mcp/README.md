@@ -106,10 +106,10 @@ export async function readMyResource(): Promise<string> {
 | Prompts | [spec][prompts] | Full | `src/prompts/` |
 | Sampling | [spec][sampling] | Full | `src/sampling/` |
 | Elicitation | [spec][elicitation] | Full | `src/elicitation/` |
-| Logging | [spec][logging] | Full | `src/logging.ts` |
+| Logging | [spec][logging] | Full | `src/spec/logging.ts` |
 | Progress | [spec][progress] | Full | `src/spec/progress.ts` |
 | Cancellation | [spec][cancellation] | Full | `src/spec/cancellation.ts` |
-| Pagination | [spec][pagination] | Full | `src/pagination.ts` |
+| Pagination | [spec][pagination] | Full | `src/spec/pagination.ts` |
 
 [tools]: https://modelcontextprotocol.io/specification/2025-03-26/server/tools
 [resources]: https://modelcontextprotocol.io/specification/2025-03-26/server/resources

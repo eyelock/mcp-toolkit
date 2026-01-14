@@ -15,6 +15,9 @@
  * - **Ping** - Liveness check for server health
  *   @see https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/ping
  *
+ * - **Logging** - RFC 5424 compliant logging with MCP protocol transport
+ *   @see https://modelcontextprotocol.io/specification/2025-03-26/server/utilities/logging
+ *
  * - **Session State** - Session state management and workflow enforcement
  *
  * @module @mcp-toolkit/mcp/spec
@@ -87,3 +90,30 @@ export {
   registerBlockingHook,
   markWorkflowHookCompleted,
 } from "./workflow-state.js";
+
+// Logging
+export {
+  LogLevel,
+  type LogData,
+  type LogMessage,
+  type LogTransport,
+  StderrTransport,
+  McpProtocolTransport,
+  type LoggerConfig,
+  Logger,
+  getLogger,
+  configureLogger,
+  addMcpTransport,
+  removeMcpTransport,
+  logDebug,
+  logInfo,
+  logNotice,
+  logWarning,
+  logError,
+  logCritical,
+  logToolRequest,
+  logResourceAccess,
+  logServerEvent,
+  LogDataSchema,
+  LogMessageSchema,
+} from "./logging.js";

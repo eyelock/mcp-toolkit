@@ -56,26 +56,28 @@ const metadata = ClientMetadataSchema.parse({
 });
 ```
 
-### Tool Delegation Strategy
+### Tool Delegation Configuration
 
 ```typescript
-import { ToolDelegationStrategySchema, type ToolDelegationStrategy } from "@mcp-toolkit/model";
+import {
+  DelegationModeSchema,
+  ToolDelegationEntrySchema,
+  type DelegationMode,
+  type ToolDelegationEntry,
+} from "@mcp-toolkit/model";
 
-// Route to server
-const serverStrategy = ToolDelegationStrategySchema.parse({
-  strategy: "server",
+// Self-reliant: never delegate (default)
+const localOnly = DelegationModeSchema.parse("local-only");
+
+// Try delegation, fallback to local
+const delegateFirst = ToolDelegationEntrySchema.parse({
+  mode: "delegate-first",
+  fallbackEnabled: true,
+  delegationTimeout: 30000,
 });
 
-// Delegate to host LLM
-const delegateStrategy = ToolDelegationStrategySchema.parse({
-  strategy: "delegate",
-  guidance: "Use the host LLM for complex reasoning tasks",
-});
-
-// Let host decide
-const deferStrategy = ToolDelegationStrategySchema.parse({
-  strategy: "defer",
-});
+// Must delegate, error if unavailable
+const delegateOnly = DelegationModeSchema.parse("delegate-only");
 ```
 
 ## Schemas
@@ -112,12 +114,19 @@ const deferStrategy = ToolDelegationStrategySchema.parse({
 }
 ```
 
-### ToolDelegationStrategySchema
+### DelegationModeSchema
+
+```typescript
+"local-only" | "delegate-first" | "delegate-only"
+```
+
+### ToolDelegationEntrySchema
 
 ```typescript
 {
-  strategy: "server" | "delegate" | "defer";
-  guidance?: string;            // Instructions for delegation
+  mode: DelegationMode;           // Delegation mode
+  delegationTimeout?: number;     // Timeout in ms (default: 30000)
+  fallbackEnabled?: boolean;      // Fallback to local on failure (default: true)
 }
 ```
 

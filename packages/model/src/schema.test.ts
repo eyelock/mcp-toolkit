@@ -106,8 +106,8 @@ describe("SessionFeaturesSchema", () => {
     expect(result).toEqual({
       tools: true,
       resources: true,
-      prompts: false,
-      sampling: false,
+      prompts: true,
+      sampling: true,
     });
   });
 

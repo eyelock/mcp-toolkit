@@ -49,8 +49,7 @@ export {
   type SessionSummary,
 } from "./review.js";
 
-import type { HookDefinitionInput } from "@mcp-toolkit/core";
-import type { BlockingHookDef } from "@mcp-toolkit/mcp";
+import type { BlockingHookDef, HookDefinitionInput } from "@mcp-toolkit/core";
 import { buildHook } from "./build.js";
 import { CONFIG_HOOK_ID, configHook } from "./config.js";
 import { modelHook } from "./model.js";

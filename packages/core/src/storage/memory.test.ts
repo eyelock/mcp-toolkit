@@ -21,8 +21,8 @@ describe("MemoryProvider", () => {
       expect(result.data?.projectName).toBe("test-project");
       expect(result.data?.features.tools).toBe(true);
       expect(result.data?.features.resources).toBe(true);
-      expect(result.data?.features.prompts).toBe(false);
-      expect(result.data?.features.sampling).toBe(false);
+      expect(result.data?.features.prompts).toBe(true);
+      expect(result.data?.features.sampling).toBe(true);
     });
 
     it("allows overriding feature defaults", async () => {

@@ -1,9 +1,10 @@
 /**
  * Prompts Registration
  *
- * Central registry for all MCP prompts.
+ * Central registry for all MCP prompts, including toolkit prompts.
  */
 
+import { getToolkitComponents, getToolkitHandlers } from "@mcp-toolkit/toolkit";
 import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { ServerContext } from "../server.js";
 import {
@@ -13,15 +14,19 @@ import {
   welcomePrompt,
 } from "./welcome.js";
 
-/**
- * All available prompts
- */
-const prompts: Prompt[] = [welcomePrompt, sessionSetupPrompt];
+// Get toolkit components and handlers
+const toolkitComponents = getToolkitComponents();
+const toolkitHandlers = getToolkitHandlers();
 
 /**
- * Prompt handlers mapped by name
+ * All core prompts
  */
-const handlers: Record<
+const corePrompts: Prompt[] = [welcomePrompt, sessionSetupPrompt];
+
+/**
+ * Prompt handlers mapped by name (core prompts only)
+ */
+const coreHandlers: Record<
   string,
   (args: Record<string, string> | undefined, context: ServerContext) => Promise<GetPromptResult>
 > = {
@@ -30,21 +35,30 @@ const handlers: Record<
 };
 
 /**
- * Register all prompts
+ * Register all prompts (core + toolkit)
  */
 export function registerPrompts(): Prompt[] {
-  return prompts;
+  return [...corePrompts, ...toolkitComponents.prompts];
 }
 
 /**
- * Handle a get prompt request
+ * Handle a get prompt request (core or toolkit)
  */
 export async function handleGetPrompt(
   name: string,
   args: Record<string, string> | undefined,
   context: ServerContext
 ): Promise<GetPromptResult> {
-  const handler = handlers[name];
+  // First check if it's a toolkit prompt
+  if (toolkitHandlers.isToolkitPrompt(name)) {
+    const result = await toolkitHandlers.handlePrompt(name, args);
+    if (result) {
+      return result;
+    }
+  }
+
+  // Then check core handlers
+  const handler = coreHandlers[name];
 
   if (!handler) {
     return {

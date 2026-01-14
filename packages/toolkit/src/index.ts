@@ -26,8 +26,9 @@ import {
   HookContentLoader,
   HookRegistry,
   type ResolvedHook,
+  type WorkflowStateTracker,
+  registerBlockingHook,
 } from "@mcp-toolkit/core";
-import { type WorkflowStateTracker, registerBlockingHook } from "@mcp-toolkit/mcp";
 import type {
   CallToolResult,
   GetPromptResult,

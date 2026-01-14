@@ -41,7 +41,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@mcp-toolkit/core": "workspace:*",
     "@mcp-toolkit/model": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {

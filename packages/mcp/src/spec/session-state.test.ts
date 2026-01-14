@@ -2,13 +2,13 @@
  * Session State Management Tests
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   type SessionStateTracker,
   SessionStateTracker as SessionStateTrackerClass,
-  createSessionStateTracker,
-  createBlockingResponse,
   WorkflowViolationError,
+  createBlockingResponse,
+  createSessionStateTracker,
 } from "./session-state.js";
 
 describe("SessionStateTracker", () => {

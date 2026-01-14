@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 import {
   DomainModelSchema,
   EntityDefinitionSchema,
-  PropertyDefinitionSchema,
-  ModelDesignInputSchema,
   GenerateInputSchema,
+  ModelDesignInputSchema,
+  PropertyDefinitionSchema,
 } from "./schema.js";
 
 describe("PropertyDefinitionSchema", () => {

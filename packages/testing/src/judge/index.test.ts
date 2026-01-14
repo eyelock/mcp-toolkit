@@ -2,9 +2,9 @@
  * LLM-as-Judge Tests
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { LLMJudge, createLLMJudge, PRESET_RUBRICS } from "./index.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LLMClient } from "../evals/index.js";
+import { LLMJudge, PRESET_RUBRICS, createLLMJudge } from "./index.js";
 
 function createMockJudgeClient(response: string): LLMClient {
   return {

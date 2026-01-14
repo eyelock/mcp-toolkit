@@ -7,7 +7,7 @@
 
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { getSessionEndHooks, getSessionStartHooks, type ServerContext } from "../server.js";
+import { type ServerContext, getSessionEndHooks, getSessionStartHooks } from "../server.js";
 
 /**
  * Stdio transport options

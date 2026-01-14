@@ -5,15 +5,15 @@
  * These tests verify that tools work correctly together in realistic scenarios.
  */
 
-import { mkdirSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestHarness, assertToolResult, runTestCases } from "@mcp-toolkit/testing";
+import { join } from "node:path";
+import { assertToolResult, createTestHarness, runTestCases } from "@mcp-toolkit/testing";
 import type { TestCase } from "@mcp-toolkit/testing";
-import { handleModelDesign } from "./model-design.js";
-import { handleGenerate } from "./generate.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntityDefinition } from "../model/index.js";
+import { handleGenerate } from "./generate.js";
+import { handleModelDesign } from "./model-design.js";
 
 // =============================================================================
 // Test Setup - Mock storage to use temp directory

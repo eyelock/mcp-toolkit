@@ -9,8 +9,8 @@ import type {
   Resource,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/types.js";
-import { MODEL_RESOURCE_URI, modelResource, readModelResource } from "./model.js";
 import { clientsResourceTemplate, getClientNames, readClientConfigResource } from "./clients.js";
+import { MODEL_RESOURCE_URI, modelResource, readModelResource } from "./model.js";
 import { getTemplateTypes, readTemplateResource, templatesResourceTemplate } from "./templates.js";
 
 // Re-export individual resources

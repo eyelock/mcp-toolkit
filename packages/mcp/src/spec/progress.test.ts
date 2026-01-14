@@ -3,13 +3,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { CancellationError } from "./cancellation.js";
 import {
   ProgressError,
   ProgressReporter,
   createProgressReporter,
   processWithProgress,
 } from "./progress.js";
-import { CancellationError } from "./cancellation.js";
 
 describe("ProgressError", () => {
   it("creates error with message", () => {

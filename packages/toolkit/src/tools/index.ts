@@ -5,9 +5,9 @@
  */
 
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { generateTool, handleGenerate } from "./generate.js";
 import { handleModelDesign, modelDesignTool } from "./model-design.js";
 import { handleModelImport, modelImportTool } from "./model-import.js";
-import { generateTool, handleGenerate } from "./generate.js";
 import {
   handleSetupClient,
   handleSetupVerify,

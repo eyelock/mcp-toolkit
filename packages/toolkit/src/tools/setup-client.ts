@@ -6,15 +6,15 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   type ClientTarget,
   type SetupClientInput,
-  type SetupVerifyInput,
   SetupClientInputSchema,
+  type SetupVerifyInput,
   SetupVerifyInputSchema,
   createToolkitStorage,
 } from "../model/index.js";

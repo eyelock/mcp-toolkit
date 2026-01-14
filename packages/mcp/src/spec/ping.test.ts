@@ -4,11 +4,11 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  handlePing,
   createServerStatus,
   formatPingResponse,
-  initializeServerStartTime,
   getServerUptimeMs,
+  handlePing,
+  initializeServerStartTime,
 } from "./ping.js";
 
 describe("handlePing", () => {

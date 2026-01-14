@@ -4,10 +4,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  toolkitPrompts,
-  registerToolkitPrompts,
-  isToolkitPrompt,
   handleToolkitPrompt,
+  isToolkitPrompt,
+  registerToolkitPrompts,
+  toolkitPrompts,
 } from "./index.js";
 
 describe("toolkitPrompts", () => {

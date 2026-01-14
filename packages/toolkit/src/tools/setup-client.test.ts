@@ -2,15 +2,15 @@
  * Setup Client Tool Tests
  */
 
-import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  setupClientTool,
-  setupVerifyTool,
   handleSetupClient,
   handleSetupVerify,
+  setupClientTool,
+  setupVerifyTool,
 } from "./setup-client.js";
 
 // Mock the storage to use a test directory

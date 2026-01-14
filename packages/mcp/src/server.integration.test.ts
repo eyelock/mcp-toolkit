@@ -5,15 +5,15 @@
  * invocation flow, session tracking, and hook execution.
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
 import { createMemoryProvider } from "@mcp-toolkit/core";
 import type { SessionProvider } from "@mcp-toolkit/core";
-import { createServer, getSessionStartHooks, getSessionEndHooks } from "./server.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { handleGetPrompt, registerPrompts } from "./prompts/index.js";
+import { handleResourceRead, registerResources } from "./resources/index.js";
+import { createServer, getSessionEndHooks, getSessionStartHooks } from "./server.js";
 import type { ServerConfig } from "./server.js";
-import { handleToolCall, registerTools } from "./tools/index.js";
-import { registerResources, handleResourceRead } from "./resources/index.js";
-import { registerPrompts, handleGetPrompt } from "./prompts/index.js";
 import { createSessionStateTracker } from "./spec/session-state.js";
+import { handleToolCall, registerTools } from "./tools/index.js";
 
 describe("MCP Server Integration Tests", () => {
   let provider: SessionProvider;

@@ -6,8 +6,8 @@
  * or adherence to complex requirements.
  */
 
+import type { ChatMessage, LLMClient } from "../evals/index.js";
 import type { JudgeVerdict } from "../schema.js";
-import type { LLMClient, ChatMessage } from "../evals/index.js";
 
 // =============================================================================
 // Types

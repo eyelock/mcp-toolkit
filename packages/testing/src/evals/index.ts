@@ -5,6 +5,7 @@
  * Designed for integration testing where tool calls follow a predetermined sequence.
  */
 
+import type { TestHarness } from "../harness/index.js";
 import type {
   Assertion,
   AssertionResult,
@@ -15,7 +16,6 @@ import type {
   LLMConfig,
   ToolCallResult,
 } from "../schema.js";
-import type { TestHarness } from "../harness/index.js";
 
 // =============================================================================
 // Types

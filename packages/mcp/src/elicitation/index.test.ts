@@ -6,19 +6,19 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  // Re-exports from helpers
-  elicitInput,
-  elicitConfirmation,
-  elicitText,
-  elicitChoice,
-  clientSupportsElicitation,
-  getElicitationTimeout,
   DEFAULT_ELICITATION_TIMEOUT_MS,
-  ElicitationNotSupportedError,
-  ElicitationDeclinedError,
-  ElicitationValidationError,
   // Example schemas
   EXAMPLE_SCHEMAS,
+  ElicitationDeclinedError,
+  ElicitationNotSupportedError,
+  ElicitationValidationError,
+  clientSupportsElicitation,
+  elicitChoice,
+  elicitConfirmation,
+  // Re-exports from helpers
+  elicitInput,
+  elicitText,
+  getElicitationTimeout,
 } from "./index.js";
 
 describe("Elicitation Module", () => {

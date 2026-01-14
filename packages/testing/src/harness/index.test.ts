@@ -2,16 +2,16 @@
  * Test Harness Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TestCase } from "../schema.js";
 import {
   TestHarness,
-  createTestHarness,
+  type ToolHandler,
   assertToolResult,
+  createTestHarness,
   runTestCase,
   runTestCases,
-  type ToolHandler,
 } from "./index.js";
-import type { TestCase } from "../schema.js";
 
 describe("TestHarness", () => {
   describe("createTestHarness", () => {

@@ -2,16 +2,16 @@
  * Reporters Tests
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { EvalResult, EvalSuiteResult } from "../schema.js";
 import {
+  consoleReporter,
+  formatResult,
+  getReporter,
+  htmlReporter,
   jsonReporter,
   markdownReporter,
-  htmlReporter,
-  consoleReporter,
-  getReporter,
-  formatResult,
 } from "./index.js";
-import type { EvalResult, EvalSuiteResult } from "../schema.js";
 
 const mockEvalResult: EvalResult = {
   scenario: "test-scenario",

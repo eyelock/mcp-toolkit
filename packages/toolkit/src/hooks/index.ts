@@ -50,12 +50,12 @@ export {
 } from "./review.js";
 
 import type { HookDefinitionInput } from "@mcp-toolkit/core";
-import { configHook, CONFIG_HOOK_ID } from "./config.js";
+import type { BlockingHookDef } from "@mcp-toolkit/mcp";
+import { buildHook } from "./build.js";
+import { CONFIG_HOOK_ID, configHook } from "./config.js";
 import { modelHook } from "./model.js";
 import { planHook } from "./plan.js";
-import { buildHook } from "./build.js";
 import { reviewHook } from "./review.js";
-import type { BlockingHookDef } from "@mcp-toolkit/mcp";
 
 /**
  * All toolkit hook definitions in workflow order

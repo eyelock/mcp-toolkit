@@ -5,8 +5,8 @@
  * Demonstrates CLI/MCP parity pattern.
  */
 
-import { SessionFeaturesSchema } from "@mcp-toolkit/model";
 import { createMemoryProvider } from "@mcp-toolkit/core";
+import { SessionFeaturesSchema } from "@mcp-toolkit/model";
 import { Args, Command, Flags } from "@oclif/core";
 
 export default class Init extends Command {

@@ -20,23 +20,23 @@
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  type ComposedHooksResult,
+  HookComposer,
+  HookContentLoader,
+  HookRegistry,
+  type ResolvedHook,
+} from "@mcp-toolkit/core";
+import { type WorkflowStateTracker, registerBlockingHook } from "@mcp-toolkit/mcp";
 import type {
   CallToolResult,
   GetPromptResult,
+  Prompt,
   ReadResourceResult,
   Resource,
   ResourceTemplate,
   Tool,
-  Prompt,
 } from "@modelcontextprotocol/sdk/types.js";
-import {
-  HookRegistry,
-  HookContentLoader,
-  HookComposer,
-  type ResolvedHook,
-  type ComposedHooksResult,
-} from "@mcp-toolkit/core";
-import { registerBlockingHook, type WorkflowStateTracker } from "@mcp-toolkit/mcp";
 
 // ===========================================================================
 // Re-exports
@@ -109,15 +109,15 @@ export type {
 // Imports for internal use
 // ===========================================================================
 
-import { allToolkitHooks, toolkitBlockingHooks, CONFIG_HOOK_ID } from "./hooks/index.js";
-import { handleToolkitToolCall, isToolkitTool, toolkitTools } from "./tools/index.js";
+import { CONFIG_HOOK_ID, allToolkitHooks, toolkitBlockingHooks } from "./hooks/index.js";
+import { handleToolkitPrompt, isToolkitPrompt, toolkitPrompts } from "./prompts/index.js";
 import {
   handleToolkitResourceRead,
   isToolkitResource,
-  toolkitResources,
   toolkitResourceTemplates,
+  toolkitResources,
 } from "./resources/index.js";
-import { handleToolkitPrompt, isToolkitPrompt, toolkitPrompts } from "./prompts/index.js";
+import { handleToolkitToolCall, isToolkitTool, toolkitTools } from "./tools/index.js";
 
 // ===========================================================================
 // Hook Management

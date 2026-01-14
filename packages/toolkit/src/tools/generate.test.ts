@@ -2,12 +2,12 @@
  * Generate Tool Tests
  */
 
-import { mkdirSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateTool, handleGenerate } from "./generate.js";
 import type { EntityDefinition } from "../model/index.js";
+import { generateTool, handleGenerate } from "./generate.js";
 
 // Mock the storage to use a test directory
 let testDir: string;

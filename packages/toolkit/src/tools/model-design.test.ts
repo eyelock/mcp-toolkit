@@ -2,12 +2,12 @@
  * Model Design Tool Tests
  */
 
-import { mkdirSync, rmSync, existsSync, chmodSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { handleModelDesign, modelDesignTool } from "./model-design.js";
 import type { EntityDefinition } from "../model/index.js";
+import { handleModelDesign, modelDesignTool } from "./model-design.js";
 
 // Mock the storage to use a test directory
 let testDir: string;

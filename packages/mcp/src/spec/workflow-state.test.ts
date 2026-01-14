@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  type BlockingHookDef,
   type WorkflowStateTracker,
+  checkWorkflowAllowed,
   createWorkflowStateTracker,
   getDefaultWorkflowTracker,
-  resetDefaultWorkflowTracker,
-  checkWorkflowAllowed,
-  registerBlockingHook,
   markWorkflowHookCompleted,
-  type BlockingHookDef,
+  registerBlockingHook,
+  resetDefaultWorkflowTracker,
 } from "./workflow-state.js";
 
 describe("WorkflowStateTracker", () => {

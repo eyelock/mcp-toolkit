@@ -2,16 +2,16 @@
  * Evals Framework Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestHarness } from "../harness/index.js";
+import type { Assertion, EvalScenario, EvalSuite, ToolCallResult } from "../schema.js";
 import {
   EvalRunner,
-  createEvalRunner,
-  evaluateAssertion,
-  createMockLLMClient,
   type LLMClient,
+  createEvalRunner,
+  createMockLLMClient,
+  evaluateAssertion,
 } from "./index.js";
-import { createTestHarness } from "../harness/index.js";
-import type { EvalScenario, EvalSuite, Assertion, ToolCallResult } from "../schema.js";
 
 describe("evaluateAssertion", () => {
   const mockToolCalls: ToolCallResult[] = [

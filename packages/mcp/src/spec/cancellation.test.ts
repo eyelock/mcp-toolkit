@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   CancellationError,
   checkCancelled,
-  isCancelled,
   createLinkedAbortController,
+  isCancelled,
   withCancellation,
 } from "./cancellation.js";
 

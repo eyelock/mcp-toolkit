@@ -19,13 +19,13 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  composeHooks,
-  createContentLoader,
-  createHookRegistry,
   type HookDefinition,
   type HookLifecycle,
   type HookRegistry,
   type HookType,
+  composeHooks,
+  createContentLoader,
+  createHookRegistry,
 } from "@mcp-toolkit/core";
 import { coreHookDefinitions } from "./definitions.js";
 

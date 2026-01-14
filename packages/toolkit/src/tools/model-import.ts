@@ -14,8 +14,8 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   type EntityDefinition,
   type ModelImportInput,
-  type PropertyType,
   ModelImportInputSchema,
+  type PropertyType,
   createToolkitStorage,
 } from "../model/index.js";
 

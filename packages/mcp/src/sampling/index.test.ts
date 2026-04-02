@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  type SessionEntry,
   createCodeReviewRequest,
   createExplanationRequest,
   createFeatureSuggestionRequest,
   createProjectDescriptionRequest,
   createSessionSummaryRequest,
   parseFeatureSuggestion,
+  type SessionEntry,
 } from "./index.js";
 
 describe("Sampling Patterns", () => {

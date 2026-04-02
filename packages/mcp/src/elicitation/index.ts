@@ -81,24 +81,24 @@
 
 // Core helpers
 export {
-  // Main functions
-  elicitInput,
-  elicitConfirmation,
-  elicitText,
-  elicitChoice,
   // Utility functions
   clientSupportsElicitation,
-  getElicitationTimeout,
   // Constants
   DEFAULT_ELICITATION_TIMEOUT_MS,
-  // Types
-  type TypedElicitResult,
-  type ElicitOptions,
-  type ElicitationSchema,
+  ElicitationDeclinedError,
   // Errors
   ElicitationNotSupportedError,
-  ElicitationDeclinedError,
+  type ElicitationSchema,
   ElicitationValidationError,
+  type ElicitOptions,
+  elicitChoice,
+  elicitConfirmation,
+  // Main functions
+  elicitInput,
+  elicitText,
+  getElicitationTimeout,
+  // Types
+  type TypedElicitResult,
 } from "./helpers.js";
 
 /**

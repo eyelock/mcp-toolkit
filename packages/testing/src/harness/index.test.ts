@@ -5,12 +5,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestCase } from "../schema.js";
 import {
-  TestHarness,
-  type ToolHandler,
   assertToolResult,
   createTestHarness,
   runTestCase,
   runTestCases,
+  TestHarness,
+  type ToolHandler,
 } from "./index.js";
 
 describe("TestHarness", () => {

@@ -1,7 +1,7 @@
 import { createMemoryProvider } from "@mcp-toolkit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ServerContext } from "../server.js";
-import { SESSION_RESOURCE_URI, readSessionResource, sessionResource } from "./session.js";
+import { readSessionResource, SESSION_RESOURCE_URI, sessionResource } from "./session.js";
 
 describe("Session Resource", () => {
   let context: ServerContext;

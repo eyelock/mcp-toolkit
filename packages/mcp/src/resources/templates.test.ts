@@ -6,13 +6,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { ServerContext } from "../server.js";
 import {
   DELEGATION_CONFIG_TEMPLATE,
-  FEATURE_CONFIG_TEMPLATE,
-  LOG_ENTRIES_TEMPLATE,
   extractTemplateParams,
+  FEATURE_CONFIG_TEMPLATE,
   getRegisteredTemplates,
   handleTemplatedResourceRead,
   handleTemplatedResourceReadFromRegistry,
   initializeTemplateRegistry,
+  LOG_ENTRIES_TEMPLATE,
   matchesTemplate,
   readDelegationConfig,
   readFeatureConfig,

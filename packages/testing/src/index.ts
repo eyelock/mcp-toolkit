@@ -48,79 +48,40 @@
  * @packageDocumentation
  */
 
-// Schema types
+// Evals Framework
 export type {
-  LLMProvider,
-  LLMConfig,
-  MockToolCall,
-  ExpectedToolResult,
-  TestCase,
-  AssertionType,
-  Assertion,
-  ScriptedToolCall,
-  EvalScenario,
-  EvalSuite,
-  AssertionResult,
-  ToolCallResult,
-  EvalResult,
-  EvalSuiteResult,
-  JudgeVerdict,
-} from "./schema.js";
-
+  ChatMessage,
+  ChatResponse,
+  EvalOptions,
+  EvalRunnerConfig,
+  LLMClient,
+  LLMClientFactory,
+} from "./evals/index.js";
 export {
-  LLMProviderSchema,
-  LLMConfigSchema,
-  MockToolCallSchema,
-  ExpectedToolResultSchema,
-  TestCaseSchema,
-  AssertionTypeSchema,
-  AssertionSchema,
-  ScriptedToolCallSchema,
-  EvalScenarioSchema,
-  EvalSuiteSchema,
-  AssertionResultSchema,
-  ToolCallResultSchema,
-  EvalResultSchema,
-  EvalSuiteResultSchema,
-  JudgeVerdictSchema,
-} from "./schema.js";
+  createAnthropicClient,
+  createEvalRunner,
+  createMockLLMClient,
+  EvalRunner,
+  evaluateAssertion,
+} from "./evals/index.js";
 
 // Test Harness
 export type {
-  ToolHandler,
-  ResourceHandler,
-  PromptHandler,
   HarnessContext,
-  TestHarnessConfig,
   HarnessToolResult,
+  PromptHandler,
+  ResourceHandler,
+  TestHarnessConfig,
+  ToolHandler,
 } from "./harness/index.js";
 
 export {
-  TestHarness,
-  createTestHarness,
   assertToolResult,
+  createTestHarness,
   runTestCase,
   runTestCases,
+  TestHarness,
 } from "./harness/index.js";
-
-// Evals Framework
-export type {
-  LLMClient,
-  ChatMessage,
-  ChatResponse,
-  LLMClientFactory,
-  EvalRunnerConfig,
-  EvalOptions,
-} from "./evals/index.js";
-
-export {
-  EvalRunner,
-  createEvalRunner,
-  evaluateAssertion,
-  createAnthropicClient,
-  createMockLLMClient,
-} from "./evals/index.js";
-
 // LLM-as-Judge
 export type {
   JudgeConfig,
@@ -128,25 +89,57 @@ export type {
   RubricCriterion,
   RubricResult,
 } from "./judge/index.js";
-
 export {
-  LLMJudge,
   createLLMJudge,
+  LLMJudge,
   PRESET_RUBRICS,
 } from "./judge/index.js";
-
 // Reporters
 export type {
-  ReportFormat,
-  ReporterOptions,
   Reporter,
+  ReporterOptions,
+  ReportFormat,
 } from "./reporters/index.js";
-
 export {
+  consoleReporter,
+  formatResult,
+  getReporter,
+  htmlReporter,
   jsonReporter,
   markdownReporter,
-  htmlReporter,
-  consoleReporter,
-  getReporter,
-  formatResult,
 } from "./reporters/index.js";
+// Schema types
+export type {
+  Assertion,
+  AssertionResult,
+  AssertionType,
+  EvalResult,
+  EvalScenario,
+  EvalSuite,
+  EvalSuiteResult,
+  ExpectedToolResult,
+  JudgeVerdict,
+  LLMConfig,
+  LLMProvider,
+  MockToolCall,
+  ScriptedToolCall,
+  TestCase,
+  ToolCallResult,
+} from "./schema.js";
+export {
+  AssertionResultSchema,
+  AssertionSchema,
+  AssertionTypeSchema,
+  EvalResultSchema,
+  EvalScenarioSchema,
+  EvalSuiteResultSchema,
+  EvalSuiteSchema,
+  ExpectedToolResultSchema,
+  JudgeVerdictSchema,
+  LLMConfigSchema,
+  LLMProviderSchema,
+  MockToolCallSchema,
+  ScriptedToolCallSchema,
+  TestCaseSchema,
+  ToolCallResultSchema,
+} from "./schema.js";

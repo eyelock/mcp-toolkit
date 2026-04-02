@@ -15,10 +15,10 @@ import {
   setupVerifyTool,
 } from "./setup-client.js";
 
+export * from "./generate.js";
 // Re-export individual tools
 export * from "./model-design.js";
 export * from "./model-import.js";
-export * from "./generate.js";
 export * from "./setup-client.js";
 
 /**

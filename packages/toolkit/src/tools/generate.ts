@@ -12,11 +12,11 @@ import { dirname, join } from "node:path";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
+  createToolkitStorage,
   type DomainModel,
   type EntityDefinition,
   type GenerateInput,
   GenerateInputSchema,
-  createToolkitStorage,
 } from "../model/index.js";
 
 /**

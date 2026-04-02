@@ -11,6 +11,10 @@ import {
   type ComposedHooksResult,
   type ComposerOptions,
   type ContentLoaderOptions,
+  composeHooks,
+  createComposer,
+  createContentLoader,
+  createHookRegistry,
   // Composer
   HookComposer,
   // Loader
@@ -33,10 +37,6 @@ import {
   type RequirementLevel,
   RequirementLevelSchema,
   type ResolvedHook,
-  composeHooks,
-  createComposer,
-  createContentLoader,
-  createHookRegistry,
 } from "./index.js";
 
 describe("Hook System Exports", () => {

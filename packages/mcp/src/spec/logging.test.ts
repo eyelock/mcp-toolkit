@@ -4,13 +4,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  LogDataSchema,
-  LogLevel,
-  LogMessageSchema,
-  Logger,
-  StderrTransport,
   configureLogger,
   getLogger,
+  LogDataSchema,
+  Logger,
+  LogLevel,
+  LogMessageSchema,
   logCritical,
   logDebug,
   logError,
@@ -20,6 +19,7 @@ import {
   logServerEvent,
   logToolRequest,
   logWarning,
+  StderrTransport,
 } from "./logging.js";
 
 describe("Logging", () => {

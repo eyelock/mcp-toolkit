@@ -6,13 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  clientSupportsElicitation,
   DEFAULT_ELICITATION_TIMEOUT_MS,
-  // Example schemas
-  EXAMPLE_SCHEMAS,
   ElicitationDeclinedError,
   ElicitationNotSupportedError,
   ElicitationValidationError,
-  clientSupportsElicitation,
+  // Example schemas
+  EXAMPLE_SCHEMAS,
   elicitChoice,
   elicitConfirmation,
   // Re-exports from helpers

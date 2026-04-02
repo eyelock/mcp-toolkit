@@ -6,8 +6,8 @@
  * - HTTP/SSE: Remote deployment, web clients
  */
 
-export { createStdioTransport, type StdioTransportOptions } from "./stdio.js";
 export { createHttpTransport, type HttpTransportConfig } from "./http.js";
+export { createStdioTransport, type StdioTransportOptions } from "./stdio.js";
 
 export type TransportMode = "stdio" | "http";
 

@@ -510,13 +510,13 @@ export function toolBenefitsFromSampling(toolName: string, config?: ToolDelegati
 
 export type {
   DelegationMode,
-  ExecutionOutcome,
   DelegationResult,
-  ToolDelegationConfig,
-  ToolDelegationEntry,
+  ExecutionOutcome,
   // Deprecated aliases
   ExecutionStrategy,
   StrategyExecutionResult,
+  ToolDelegationConfig,
+  ToolDelegationEntry,
   ToolStrategyConfig,
   ToolStrategyEntry,
 } from "@mcp-toolkit/model";

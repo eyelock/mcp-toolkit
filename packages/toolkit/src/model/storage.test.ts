@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EntityDefinition } from "./schema.js";
-import { ToolkitStorage, createToolkitStorage } from "./storage.js";
+import { createToolkitStorage, ToolkitStorage } from "./storage.js";
 
 describe("ToolkitStorage", () => {
   let testDir: string;

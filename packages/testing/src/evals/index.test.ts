@@ -6,11 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestHarness } from "../harness/index.js";
 import type { Assertion, EvalScenario, EvalSuite, ToolCallResult } from "../schema.js";
 import {
-  EvalRunner,
-  type LLMClient,
   createEvalRunner,
   createMockLLMClient,
+  EvalRunner,
   evaluateAssertion,
+  type LLMClient,
 } from "./index.js";
 
 describe("evaluateAssertion", () => {

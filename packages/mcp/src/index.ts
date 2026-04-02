@@ -117,13 +117,12 @@ main().catch((error) => {
   process.exit(1);
 });
 
+// Hooks system
+export * from "./hooks/index.js";
+export type { CreateServerResult, ServerConfig, ServerContext } from "./server.js";
 // Re-export for library usage
-export { createServer, getSessionStartHooks, getSessionEndHooks } from "./server.js";
-export type { ServerConfig, ServerContext, CreateServerResult } from "./server.js";
-export * from "./transport/index.js";
+export { createServer, getSessionEndHooks, getSessionStartHooks } from "./server.js";
 
 // MCP Specification implementations
 export * from "./spec/index.js";
-
-// Hooks system
-export * from "./hooks/index.js";
+export * from "./transport/index.js";

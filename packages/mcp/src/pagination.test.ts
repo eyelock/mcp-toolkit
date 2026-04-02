@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_PAGE_SIZE,
-  InvalidCursorError,
   createPaginatedResponse,
+  DEFAULT_PAGE_SIZE,
   decodeCursor,
   encodeCursor,
+  InvalidCursorError,
   paginateResults,
 } from "./pagination.js";
 

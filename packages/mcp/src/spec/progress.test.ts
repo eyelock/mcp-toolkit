@@ -5,9 +5,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { CancellationError } from "./cancellation.js";
 import {
+  createProgressReporter,
   ProgressError,
   ProgressReporter,
-  createProgressReporter,
   processWithProgress,
 } from "./progress.js";
 

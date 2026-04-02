@@ -11,10 +11,10 @@ import {
   getTemplateTypes,
   handleToolkitResourceRead,
   isToolkitResource,
-  registerToolkitResourceTemplates,
   registerToolkitResources,
-  toolkitResourceTemplates,
+  registerToolkitResourceTemplates,
   toolkitResources,
+  toolkitResourceTemplates,
 } from "./index.js";
 
 // Mock the storage to use a test directory

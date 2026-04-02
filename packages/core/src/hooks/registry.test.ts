@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { type HookRegistry, createHookRegistry } from "./registry.js";
+import { createHookRegistry, type HookRegistry } from "./registry.js";
 import type { HookDefinitionInput } from "./types.js";
 
 describe("HookRegistry", () => {

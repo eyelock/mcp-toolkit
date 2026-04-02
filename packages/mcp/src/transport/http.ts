@@ -7,13 +7,13 @@
  */
 
 import {
+  createServer as createHttpServer,
   type IncomingMessage,
   type ServerResponse,
-  createServer as createHttpServer,
 } from "node:http";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { type ServerContext, getSessionEndHooks, getSessionStartHooks } from "../server.js";
+import { getSessionEndHooks, getSessionStartHooks, type ServerContext } from "../server.js";
 
 export interface HttpTransportConfig {
   port?: number;

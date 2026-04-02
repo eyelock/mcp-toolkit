@@ -6,7 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type HookContentLoader, createContentLoader } from "./loader.js";
+import { createContentLoader, type HookContentLoader } from "./loader.js";
 import type { HookDefinition } from "./types.js";
 
 describe("HookContentLoader", () => {

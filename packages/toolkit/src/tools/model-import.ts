@@ -12,11 +12,11 @@ import { readFileSync } from "node:fs";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
+  createToolkitStorage,
   type EntityDefinition,
   type ModelImportInput,
   ModelImportInputSchema,
   type PropertyType,
-  createToolkitStorage,
 } from "../model/index.js";
 
 /**

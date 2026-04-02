@@ -4,7 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { LLMClient } from "../evals/index.js";
-import { LLMJudge, PRESET_RUBRICS, createLLMJudge } from "./index.js";
+import { createLLMJudge, LLMJudge, PRESET_RUBRICS } from "./index.js";
 
 function createMockJudgeClient(response: string): LLMClient {
   return {

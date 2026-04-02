@@ -2,7 +2,7 @@ import { SessionConfigSchema } from "@mcp-toolkit/model";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // Test index.ts re-exports
 import * as StorageExports from "./index.js";
-import { MemoryProvider, createMemoryProvider } from "./memory.js";
+import { createMemoryProvider, MemoryProvider } from "./memory.js";
 
 describe("MemoryProvider", () => {
   let provider: MemoryProvider;

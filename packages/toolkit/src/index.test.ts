@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  createWorkflowStateTracker,
   HookRegistry,
   type WorkflowStateTracker,
-  createWorkflowStateTracker,
 } from "@mcp-toolkit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  CONFIG_HOOK_ID,
   allToolkitHooks,
   buildHook,
+  CONFIG_HOOK_ID,
   composeToolkitHooks,
   configHook,
   createToolkitRegistry,

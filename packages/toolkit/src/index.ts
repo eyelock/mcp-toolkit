@@ -26,8 +26,8 @@ import {
   HookContentLoader,
   HookRegistry,
   type ResolvedHook,
-  type WorkflowStateTracker,
   registerBlockingHook,
+  type WorkflowStateTracker,
 } from "@mcp-toolkit/core";
 import type {
   CallToolResult,
@@ -43,80 +43,75 @@ import type {
 // Re-exports
 // ===========================================================================
 
-// Hook definitions
-export * from "./hooks/index.js";
-
-// Model schemas and storage (explicit exports to avoid conflicts with hooks)
-export {
-  // Schemas
-  PropertyTypeSchema,
-  PropertyDefinitionSchema,
-  RelationshipTypeSchema,
-  RelationshipDefinitionSchema,
-  EntityDefinitionSchema,
-  DomainModelSchema,
-  GenerationTierSchema,
-  ClientTargetSchema,
-  ToolkitStateSchema,
-  EntityInputSchema,
-  ModelDesignInputSchema,
-  ModelImportInputSchema,
-  GenerateInputSchema,
-  SetupClientInputSchema,
-  SetupVerifyInputSchema,
-  // Types
-  type PropertyType,
-  type PropertyDefinition,
-  type RelationshipType,
-  type RelationshipDefinition,
-  type EntityDefinition as ToolkitEntityDefinition,
-  type DomainModel as ToolkitDomainModel,
-  type GenerationTier,
-  type ClientTarget,
-  type ToolkitState,
-  type EntityInput,
-  type ModelDesignInput,
-  type ModelImportInput,
-  type GenerateInput,
-  type SetupClientInput,
-  type SetupVerifyInput,
-  // Storage
-  MODEL_FILENAME,
-  STATE_FILENAME,
-  type StorageOptions,
-  type StorageResult,
-  ToolkitStorage,
-  createToolkitStorage,
-} from "./model/index.js";
-
-// MCP Tools
-export * from "./tools/index.js";
-
-// MCP Resources
-export * from "./resources/index.js";
-
-// MCP Prompts
-export * from "./prompts/index.js";
-
 // Re-export hook types from core for convenience
 export type {
+  ComposedHooksResult,
   HookDefinition,
   HookDefinitionInput,
   ResolvedHook,
-  ComposedHooksResult,
 } from "@mcp-toolkit/core";
+// Hook definitions
+export * from "./hooks/index.js";
+// Model schemas and storage (explicit exports to avoid conflicts with hooks)
+export {
+  type ClientTarget,
+  ClientTargetSchema,
+  createToolkitStorage,
+  type DomainModel as ToolkitDomainModel,
+  DomainModelSchema,
+  type EntityDefinition as ToolkitEntityDefinition,
+  EntityDefinitionSchema,
+  type EntityInput,
+  EntityInputSchema,
+  type GenerateInput,
+  GenerateInputSchema,
+  type GenerationTier,
+  GenerationTierSchema,
+  // Storage
+  MODEL_FILENAME,
+  type ModelDesignInput,
+  ModelDesignInputSchema,
+  type ModelImportInput,
+  ModelImportInputSchema,
+  type PropertyDefinition,
+  PropertyDefinitionSchema,
+  // Types
+  type PropertyType,
+  // Schemas
+  PropertyTypeSchema,
+  type RelationshipDefinition,
+  RelationshipDefinitionSchema,
+  type RelationshipType,
+  RelationshipTypeSchema,
+  type SetupClientInput,
+  SetupClientInputSchema,
+  type SetupVerifyInput,
+  SetupVerifyInputSchema,
+  STATE_FILENAME,
+  type StorageOptions,
+  type StorageResult,
+  type ToolkitState,
+  ToolkitStateSchema,
+  ToolkitStorage,
+} from "./model/index.js";
+// MCP Prompts
+export * from "./prompts/index.js";
+// MCP Resources
+export * from "./resources/index.js";
+// MCP Tools
+export * from "./tools/index.js";
 
 // ===========================================================================
 // Imports for internal use
 // ===========================================================================
 
-import { CONFIG_HOOK_ID, allToolkitHooks, toolkitBlockingHooks } from "./hooks/index.js";
+import { allToolkitHooks, CONFIG_HOOK_ID, toolkitBlockingHooks } from "./hooks/index.js";
 import { handleToolkitPrompt, isToolkitPrompt, toolkitPrompts } from "./prompts/index.js";
 import {
   handleToolkitResourceRead,
   isToolkitResource,
-  toolkitResourceTemplates,
   toolkitResources,
+  toolkitResourceTemplates,
 } from "./resources/index.js";
 import { handleToolkitToolCall, isToolkitTool, toolkitTools } from "./tools/index.js";
 

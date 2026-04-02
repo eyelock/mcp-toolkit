@@ -12,11 +12,11 @@ import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   type ClientTarget,
+  createToolkitStorage,
   type SetupClientInput,
   SetupClientInputSchema,
   type SetupVerifyInput,
   SetupVerifyInputSchema,
-  createToolkitStorage,
 } from "../model/index.js";
 
 /**

@@ -30,41 +30,38 @@
  * ```
  */
 
-// Types
-export {
-  HookTypeSchema,
-  HookLifecycleSchema,
-  RequirementLevelSchema,
-  McpFeatureSchema,
-  HookDefinitionSchema,
-  HookDefinitionInputSchema,
-  HookQueryOptionsSchema,
-  type HookType,
-  type HookLifecycle,
-  type RequirementLevel,
-  type McpFeature,
-  type HookDefinition,
-  type HookDefinitionInput,
-  type ResolvedHook,
-  type HookQueryOptions,
-  type HookSummary,
-  type ComposedHooksResult,
-} from "./types.js";
-
-// Registry
-export { HookRegistry, createHookRegistry } from "./registry.js";
-
-// Content Loader
-export {
-  HookContentLoader,
-  createContentLoader,
-  type ContentLoaderOptions,
-} from "./loader.js";
-
 // Composer
 export {
-  HookComposer,
-  createComposer,
-  composeHooks,
   type ComposerOptions,
+  composeHooks,
+  createComposer,
+  HookComposer,
 } from "./composer.js";
+// Content Loader
+export {
+  type ContentLoaderOptions,
+  createContentLoader,
+  HookContentLoader,
+} from "./loader.js";
+// Registry
+export { createHookRegistry, HookRegistry } from "./registry.js";
+// Types
+export {
+  type ComposedHooksResult,
+  type HookDefinition,
+  type HookDefinitionInput,
+  HookDefinitionInputSchema,
+  HookDefinitionSchema,
+  type HookLifecycle,
+  HookLifecycleSchema,
+  type HookQueryOptions,
+  HookQueryOptionsSchema,
+  type HookSummary,
+  type HookType,
+  HookTypeSchema,
+  type McpFeature,
+  McpFeatureSchema,
+  type RequirementLevel,
+  RequirementLevelSchema,
+  type ResolvedHook,
+} from "./types.js";

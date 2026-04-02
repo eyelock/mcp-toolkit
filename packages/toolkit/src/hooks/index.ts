@@ -12,41 +12,38 @@
  * 5. Review - Summarize and identify next steps
  */
 
+export {
+  BUILD_HOOK_ID,
+  buildHook,
+  type PromptGuidance,
+  type ResourceGuidance,
+  type ToolGuidance,
+} from "./build.js";
 // Individual hook exports
 export {
   CONFIG_HOOK_ID,
   configHook,
-  type ToolkitConfig,
   defaultToolkitConfig,
+  type ToolkitConfig,
 } from "./config.js";
-
 export {
+  type DomainModel,
+  type EntityDefinition,
   MODEL_HOOK_ID,
   modelHook,
-  type EntityDefinition,
-  type DomainModel,
 } from "./model.js";
-
 export {
-  PLAN_HOOK_ID,
-  planHook,
   type ImplementationPhase,
   type ImplementationPlan,
+  PLAN_HOOK_ID,
+  planHook,
 } from "./plan.js";
-
-export {
-  BUILD_HOOK_ID,
-  buildHook,
-  type ToolGuidance,
-  type ResourceGuidance,
-  type PromptGuidance,
-} from "./build.js";
 
 export {
   REVIEW_HOOK_ID,
   reviewHook,
-  type WorkItem,
   type SessionSummary,
+  type WorkItem,
 } from "./review.js";
 
 import type { BlockingHookDef, HookDefinitionInput } from "@mcp-toolkit/core";

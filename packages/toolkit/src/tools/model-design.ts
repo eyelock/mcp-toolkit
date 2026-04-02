@@ -8,11 +8,11 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
+  createToolkitStorage,
   type DomainModel,
   type EntityDefinition,
   type ModelDesignInput,
   ModelDesignInputSchema,
-  createToolkitStorage,
 } from "../model/index.js";
 
 /**

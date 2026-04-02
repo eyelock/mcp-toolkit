@@ -8,8 +8,8 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertToolResult, createTestHarness, runTestCases } from "@mcp-toolkit/testing";
 import type { TestCase } from "@mcp-toolkit/testing";
+import { assertToolResult, createTestHarness, runTestCases } from "@mcp-toolkit/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntityDefinition } from "../model/index.js";
 import { handleGenerate } from "./generate.js";

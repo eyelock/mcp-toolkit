@@ -26,7 +26,7 @@ import {
 import { loadCoreHooks } from "./hooks/index.js";
 import { handleGetPrompt, registerPrompts } from "./prompts/index.js";
 import { handleResourceRead, registerResources } from "./resources/index.js";
-import { type SessionStateTracker, createSessionStateTracker } from "./spec/session-state.js";
+import { createSessionStateTracker, type SessionStateTracker } from "./spec/session-state.js";
 import { handleToolCall, registerTools } from "./tools/index.js";
 
 /**

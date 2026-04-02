@@ -13,10 +13,10 @@ import { clientsResourceTemplate, getClientNames, readClientConfigResource } fro
 import { MODEL_RESOURCE_URI, modelResource, readModelResource } from "./model.js";
 import { getTemplateTypes, readTemplateResource, templatesResourceTemplate } from "./templates.js";
 
+export * from "./clients.js";
 // Re-export individual resources
 export * from "./model.js";
 export * from "./templates.js";
-export * from "./clients.js";
 
 /**
  * All toolkit static resources

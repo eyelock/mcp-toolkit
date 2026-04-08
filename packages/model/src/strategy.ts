@@ -132,10 +132,7 @@ export const ToolStrategyEntrySchema = ToolDelegationEntrySchema;
  */
 export const ToolDelegationConfigSchema = z
   .record(
-    z
-      .string()
-      .min(1)
-      .max(100), // Tool name
+    z.string().min(1).max(100), // Tool name
     ToolDelegationEntrySchema
   )
   .default({})

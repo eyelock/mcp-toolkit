@@ -24,16 +24,16 @@
   "dependencies": {
     "@mcp-toolkit/core": "workspace:*",
     "@mcp-toolkit/model": "workspace:*",
-    "@oclif/core": "^4.10.3",
+    "@oclif/core": "^4.10.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "@vitest/coverage-v8": "^2.1.8",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.3"
   },
   "oclif": {
     "bin": "mcp-toolkit-cli",

@@ -211,7 +211,7 @@ export const GenerateInputSchema = z.object({
 export const SetupClientInputSchema = z.object({
   client: ClientTargetSchema.describe("Target client to configure"),
   serverPath: z.string().optional().describe("Path to MCP server (auto-detected if omitted)"),
-  options: z.record(z.string()).optional().describe("Client-specific options"),
+  options: z.record(z.string(), z.string()).optional().describe("Client-specific options"),
 });
 
 /**

@@ -6,7 +6,7 @@
  */
 
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import {
   createToolkitStorage,
   type DomainModel,
@@ -24,7 +24,7 @@ export const modelDesignTool: Tool = {
     "Design a domain model for your MCP server. Use 'start' to begin a new model, " +
     "'add-entity' to add entities, 'update-entity' to modify, 'remove-entity' to delete, " +
     "'show' to display the current model, and 'finalize' when design is complete.",
-  inputSchema: zodToJsonSchema(ModelDesignInputSchema) as Tool["inputSchema"],
+  inputSchema: ModelDesignInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**

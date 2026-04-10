@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import {
   type ClientTarget,
   createToolkitStorage,
@@ -27,7 +27,7 @@ export const setupClientTool: Tool = {
   description:
     "Configure an IDE or CLI to use your MCP server. " +
     "Supports: claude-desktop, cursor, vscode, cli.",
-  inputSchema: zodToJsonSchema(SetupClientInputSchema) as Tool["inputSchema"],
+  inputSchema: SetupClientInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**
@@ -38,7 +38,7 @@ export const setupVerifyTool: Tool = {
   description:
     "Verify that the MCP server is correctly configured for a client. " +
     "Checks configuration files and connection.",
-  inputSchema: zodToJsonSchema(SetupVerifyInputSchema) as Tool["inputSchema"],
+  inputSchema: SetupVerifyInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**

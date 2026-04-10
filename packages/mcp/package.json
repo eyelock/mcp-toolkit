@@ -49,7 +49,7 @@
     "@mcp-toolkit/vitest-config": "workspace:*",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "typescript": "^5.7.2",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.4"
   }
 }

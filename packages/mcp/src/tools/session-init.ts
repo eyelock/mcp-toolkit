@@ -17,7 +17,7 @@ import {
 import { getToolkitComponents } from "@mcp-toolkit/toolkit";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import { logDebug, logInfo } from "../logging.js";
 import type { ServerContext } from "../server.js";
 import { discoverClientMetadata } from "../strategy/client-discovery.js";
@@ -39,7 +39,7 @@ export const sessionInitTool: Tool = {
   description:
     "Initialize a new session with project configuration. Sets up the project name, enables MCP features, " +
     "and optionally discovers client metadata via sampling.",
-  inputSchema: zodToJsonSchema(SessionInitInputSchema) as Tool["inputSchema"],
+  inputSchema: SessionInitInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**
@@ -246,12 +246,12 @@ export async function handleSessionInit(
 export const sessionUpdateTool: Tool = {
   name: "session_update",
   description: "Update the current session configuration.",
-  inputSchema: zodToJsonSchema(
-    z.object({
+  inputSchema: z
+    .object({
       projectName: z.string().optional().describe("New project name"),
       features: SessionFeaturesSchema.partial().optional().describe("Features to update"),
     })
-  ) as Tool["inputSchema"],
+    .toJSONSchema() as Tool["inputSchema"],
 };
 
 export async function handleSessionUpdate(

@@ -10,7 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import {
   createToolkitStorage,
   type EntityDefinition,
@@ -27,7 +27,7 @@ export const modelImportTool: Tool = {
   description:
     "Import entity definitions from external sources. Supports OpenAPI specs, JSON Schema, " +
     "plain text descriptions, or URLs. Entities are merged into the current model.",
-  inputSchema: zodToJsonSchema(ModelImportInputSchema) as Tool["inputSchema"],
+  inputSchema: ModelImportInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**

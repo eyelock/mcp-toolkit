@@ -38,7 +38,7 @@ export type LLMConfig = z.infer<typeof LLMConfigSchema>;
  */
 export const MockToolCallSchema = z.object({
   name: z.string().describe("Tool name to call"),
-  arguments: z.record(z.unknown()).default({}).describe("Tool arguments"),
+  arguments: z.record(z.string(), z.unknown()).default({}).describe("Tool arguments"),
 });
 export type MockToolCall = z.infer<typeof MockToolCallSchema>;
 
@@ -49,7 +49,7 @@ export const ExpectedToolResultSchema = z.object({
   isError: z.boolean().optional(),
   contentContains: z.string().optional().describe("Text the content should contain"),
   contentMatches: z.string().optional().describe("Regex pattern to match"),
-  custom: z.function().args(z.unknown()).returns(z.boolean()).optional(),
+  custom: z.function({ input: [z.unknown()], output: z.boolean() }).optional(),
 });
 export type ExpectedToolResult = z.infer<typeof ExpectedToolResultSchema>;
 
@@ -61,8 +61,8 @@ export const TestCaseSchema = z.object({
   description: z.string().optional(),
   toolCall: MockToolCallSchema,
   expected: ExpectedToolResultSchema.optional(),
-  setup: z.function().returns(z.promise(z.void())).optional(),
-  teardown: z.function().returns(z.promise(z.void())).optional(),
+  setup: z.function({ input: [], output: z.promise(z.void()) }).optional(),
+  teardown: z.function({ input: [], output: z.promise(z.void()) }).optional(),
 });
 export type TestCase = z.infer<typeof TestCaseSchema>;
 
@@ -90,14 +90,12 @@ export type AssertionType = z.infer<typeof AssertionTypeSchema>;
 export const AssertionSchema = z.object({
   type: AssertionTypeSchema,
   tool: z.string().optional().describe("Tool name for tool-* assertions"),
-  args: z.record(z.unknown()).optional().describe("Expected args for tool-args-match"),
+  args: z.record(z.string(), z.unknown()).optional().describe("Expected args for tool-args-match"),
   text: z.string().optional().describe("Text for response-contains"),
   pattern: z.string().optional().describe("Regex for response-matches"),
   criteria: z.string().optional().describe("Criteria for llm-judge"),
   fn: z
-    .function()
-    .args(z.unknown())
-    .returns(z.boolean())
+    .function({ input: [z.unknown()], output: z.boolean() })
     .optional()
     .describe("Custom assertion function"),
   weight: z.number().min(0).max(1).default(1).describe("Weight for scoring"),
@@ -109,7 +107,7 @@ export type Assertion = z.infer<typeof AssertionSchema>;
  */
 export const ScriptedToolCallSchema = z.object({
   tool: z.string().describe("Tool to call"),
-  arguments: z.record(z.unknown()).default({}),
+  arguments: z.record(z.string(), z.unknown()).default({}),
   expectedResult: ExpectedToolResultSchema.optional(),
 });
 export type ScriptedToolCall = z.infer<typeof ScriptedToolCallSchema>;
@@ -139,7 +137,7 @@ export const EvalScenarioSchema = z.object({
         .default("all-assertions"),
       threshold: z.number().min(0).max(1).default(1).describe("Threshold for weighted-threshold"),
     })
-    .default({}),
+    .default({ passCriteria: "all-assertions", threshold: 1 }),
 
   // Timeout for the eval
   timeoutMs: z.number().positive().default(60_000),
@@ -154,8 +152,8 @@ export const EvalSuiteSchema = z.object({
   description: z.string().optional(),
   scenarios: z.array(EvalScenarioSchema),
   llmConfig: LLMConfigSchema.optional().describe("LLM config for all scenarios"),
-  setup: z.function().returns(z.promise(z.void())).optional(),
-  teardown: z.function().returns(z.promise(z.void())).optional(),
+  setup: z.function({ input: [], output: z.promise(z.void()) }).optional(),
+  teardown: z.function({ input: [], output: z.promise(z.void()) }).optional(),
 });
 export type EvalSuite = z.infer<typeof EvalSuiteSchema>;
 
@@ -179,7 +177,7 @@ export type AssertionResult = z.infer<typeof AssertionResultSchema>;
  */
 export const ToolCallResultSchema = z.object({
   tool: z.string(),
-  arguments: z.record(z.unknown()),
+  arguments: z.record(z.string(), z.unknown()),
   result: z.unknown(),
   durationMs: z.number(),
   error: z.string().optional(),

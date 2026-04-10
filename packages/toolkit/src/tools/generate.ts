@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import {
   createToolkitStorage,
   type DomainModel,
@@ -28,7 +28,7 @@ export const generateTool: Tool = {
     "Generate MCP code from your domain model. Choose a tier: " +
     "'definitions' (registration only), 'stubs' (with TODOs), or 'full' (complete CRUD). " +
     "Use dryRun=true to preview without writing files.",
-  inputSchema: zodToJsonSchema(GenerateInputSchema) as Tool["inputSchema"],
+  inputSchema: GenerateInputSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 /**

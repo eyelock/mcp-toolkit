@@ -65,119 +65,123 @@ export type McpFeature = z.infer<typeof McpFeatureSchema>;
 // ============================================================================
 
 /**
+ * Base hook object schema (without computed fields).
+ * Exported to allow schema composition (e.g. partial inputs).
+ */
+export const HookDefinitionObjectSchema = z.object({
+  // Identity
+  app: z
+    .string()
+    .optional()
+    .default("mcp-toolkit")
+    .describe("App prefix (e.g., 'mcp-toolkit'). Defaults to 'mcp-toolkit'."),
+
+  tag: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9-]+$/, "Tag must be kebab-case (lowercase letters, numbers, hyphens)")
+    .describe("Required. Machine-friendly ID, filesystem-safe (e.g., 'welcome', 'init-required')"),
+
+  type: HookTypeSchema,
+
+  lifecycle: HookLifecycleSchema,
+
+  // Metadata
+  name: z.string().min(1).describe("Human-readable name for this hook"),
+
+  description: z.string().optional().describe("Brief description of what this hook provides"),
+
+  // Requirement Level (RFC 2119)
+  requirementLevel: RequirementLevelSchema.describe(
+    "RFC 2119 requirement level: MUST, MUST NOT, SHOULD, SHOULD NOT, MAY"
+  ),
+
+  // Ordering within requirement level
+  priority: z
+    .number()
+    .int()
+    .default(50)
+    .describe("Order within requirement level (higher = more important, default: 50)"),
+
+  // Content
+  contentFile: z
+    .string()
+    .optional()
+    .describe(
+      "Optional explicit path to .md content file. Default: adjacent .md with same name as tag"
+    ),
+
+  // Conditions
+  conditions: z
+    .object({
+      requiresStorage: z
+        .array(z.string())
+        .optional()
+        .describe("Only include if one of these storage backends is active"),
+      requiresFeatures: z
+        .array(McpFeatureSchema)
+        .optional()
+        .describe("Only include if these MCP features are available"),
+      requiresConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Only include if config matches these values"),
+    })
+    .optional()
+    .describe("Conditions that must be met for this hook to be included"),
+
+  // Request context (for running/progress/cancel lifecycle)
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Session ID this hook is tied to (for request-scoped hooks)"),
+
+  requestId: z
+    .string()
+    .optional()
+    .describe("MCP request ID this hook is tied to (for running/progress/cancel lifecycle)"),
+
+  // Tags for categorization
+  tags: z.array(z.string()).default([]).describe("Tags for categorization and filtering"),
+
+  // Workflow control
+  blocking: z
+    .boolean()
+    .default(false)
+    .describe(
+      "If true, this hook blocks further tool execution until its workflow completes (e.g., config gathering)"
+    ),
+
+  dependencies: z
+    .array(z.string())
+    .default([])
+    .describe("Hook IDs that must complete before this hook can be active"),
+});
+
+/**
  * Complete hook definition with metadata
  *
  * ID is computed as: `${app}:${type}:${lifecycle}:${tag}`
  */
-export const HookDefinitionSchema = z
-  .object({
-    // Identity
-    app: z
-      .string()
-      .optional()
-      .default("mcp-toolkit")
-      .describe("App prefix (e.g., 'mcp-toolkit'). Defaults to 'mcp-toolkit'."),
-
-    tag: z
-      .string()
-      .min(1)
-      .regex(/^[a-z0-9-]+$/, "Tag must be kebab-case (lowercase letters, numbers, hyphens)")
-      .describe(
-        "Required. Machine-friendly ID, filesystem-safe (e.g., 'welcome', 'init-required')"
-      ),
-
-    type: HookTypeSchema,
-
-    lifecycle: HookLifecycleSchema,
-
-    // Metadata
-    name: z.string().min(1).describe("Human-readable name for this hook"),
-
-    description: z.string().optional().describe("Brief description of what this hook provides"),
-
-    // Requirement Level (RFC 2119)
-    requirementLevel: RequirementLevelSchema.describe(
-      "RFC 2119 requirement level: MUST, MUST NOT, SHOULD, SHOULD NOT, MAY"
-    ),
-
-    // Ordering within requirement level
-    priority: z
-      .number()
-      .int()
-      .default(50)
-      .describe("Order within requirement level (higher = more important, default: 50)"),
-
-    // Content
-    contentFile: z
-      .string()
-      .optional()
-      .describe(
-        "Optional explicit path to .md content file. Default: adjacent .md with same name as tag"
-      ),
-
-    // Conditions
-    conditions: z
-      .object({
-        requiresStorage: z
-          .array(z.string())
-          .optional()
-          .describe("Only include if one of these storage backends is active"),
-        requiresFeatures: z
-          .array(McpFeatureSchema)
-          .optional()
-          .describe("Only include if these MCP features are available"),
-        requiresConfig: z
-          .record(z.unknown())
-          .optional()
-          .describe("Only include if config matches these values"),
-      })
-      .optional()
-      .describe("Conditions that must be met for this hook to be included"),
-
-    // Request context (for running/progress/cancel lifecycle)
-    sessionId: z
-      .string()
-      .optional()
-      .describe("Session ID this hook is tied to (for request-scoped hooks)"),
-
-    requestId: z
-      .string()
-      .optional()
-      .describe("MCP request ID this hook is tied to (for running/progress/cancel lifecycle)"),
-
-    // Tags for categorization
-    tags: z.array(z.string()).default([]).describe("Tags for categorization and filtering"),
-
-    // Workflow control
-    blocking: z
-      .boolean()
-      .default(false)
-      .describe(
-        "If true, this hook blocks further tool execution until its workflow completes (e.g., config gathering)"
-      ),
-
-    dependencies: z
-      .array(z.string())
-      .default([])
-      .describe("Hook IDs that must complete before this hook can be active"),
-  })
-  .transform((data) => ({
-    ...data,
-    // Computed ID property
-    id: `${data.app}:${data.type}:${data.lifecycle}:${data.tag}` as const,
-  }));
+export const HookDefinitionSchema = HookDefinitionObjectSchema.transform((data) => ({
+  ...data,
+  // Computed ID property
+  id: `${data.app}:${data.type}:${data.lifecycle}:${data.tag}` as const,
+}));
 
 export type HookDefinition = z.infer<typeof HookDefinitionSchema>;
 
 /**
- * Input schema for registering hooks (without requiring all defaults)
+ * Input schema for registering hooks (without requiring all defaults).
+ * Uses extend to override defaulted fields so omitted values remain undefined
+ * rather than having defaults applied at parse time.
  */
-export const HookDefinitionInputSchema = HookDefinitionSchema.innerType().partial({
-  app: true,
-  priority: true,
-  tags: true,
-  blocking: true,
-  dependencies: true,
+export const HookDefinitionInputSchema = HookDefinitionObjectSchema.extend({
+  app: z.string().optional(),
+  priority: z.number().int().optional(),
+  tags: z.array(z.string()).optional(),
+  blocking: z.boolean().optional(),
+  dependencies: z.array(z.string()).optional(),
 });
 
 export type HookDefinitionInput = z.input<typeof HookDefinitionInputSchema>;
@@ -216,7 +220,10 @@ export const HookQueryOptionsSchema = z.object({
 
   feature: McpFeatureSchema.optional().describe("Current feature (for condition evaluation)"),
 
-  config: z.record(z.unknown()).optional().describe("Current config (for condition evaluation)"),
+  config: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Current config (for condition evaluation)"),
 
   sessionId: z.string().optional().describe("Filter to hooks for this session"),
 

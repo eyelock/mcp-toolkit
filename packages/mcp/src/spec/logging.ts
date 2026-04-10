@@ -496,7 +496,10 @@ export const LogDataSchema = z.object({
     })
     .optional()
     .describe("Error details if applicable"),
-  metadata: z.record(z.unknown()).optional().describe("Additional context-specific data"),
+  metadata: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Additional context-specific data"),
 });
 
 /** Schema for complete log message (MCP format) */

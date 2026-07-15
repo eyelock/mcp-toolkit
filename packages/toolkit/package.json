@@ -55,7 +55,7 @@
     "@mcp-toolkit/testing": "workspace:*",
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"

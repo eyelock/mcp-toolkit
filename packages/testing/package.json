@@ -38,19 +38,19 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.89.0",
+    "@anthropic-ai/sdk": "^0.112.5",
     "@mcp-toolkit/core": "workspace:*",
     "@mcp-toolkit/model": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
-    "@types/node": "^26.0.1",
-    "@vitest/coverage-v8": "^4.1.4",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.10"
   },
   "keywords": [
     "mcp",

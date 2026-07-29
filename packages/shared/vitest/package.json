@@ -8,6 +8,6 @@
     ".": "./index.js"
   },
   "dependencies": {
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.10"
   }
 }

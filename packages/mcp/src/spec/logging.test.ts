@@ -19,6 +19,8 @@ import {
   logServerEvent,
   logToolRequest,
   logWarning,
+  McpProtocolTransport,
+  OTEL_SEVERITY_NUMBER,
   StderrTransport,
 } from "./logging.js";
 
@@ -358,6 +360,94 @@ describe("Logging", () => {
 
       // Reset to default for other tests
       configureLogger({ minLevel: "info" });
+    });
+  });
+
+  describe("OpenTelemetry compatibility", () => {
+    // The spec replaces protocol logging with stderr + OTel, so stderr output
+    // carries the OTel log-data-model fields a collector expects.
+    it("maps every level to an OTel SeverityNumber", () => {
+      expect(OTEL_SEVERITY_NUMBER).toEqual({
+        debug: 5,
+        info: 9,
+        notice: 10,
+        warning: 13,
+        error: 17,
+        critical: 19,
+        alert: 21,
+        emergency: 23,
+      });
+    });
+
+    it("orders severities the same way as the log levels", () => {
+      expect(OTEL_SEVERITY_NUMBER.debug).toBeLessThan(OTEL_SEVERITY_NUMBER.info);
+      expect(OTEL_SEVERITY_NUMBER.warning).toBeLessThan(OTEL_SEVERITY_NUMBER.error);
+      expect(OTEL_SEVERITY_NUMBER.error).toBeLessThan(OTEL_SEVERITY_NUMBER.emergency);
+    });
+
+    it("emits SeverityNumber and SeverityText on stderr", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const transport = new StderrTransport({ minLevel: "debug" });
+
+      transport.write({ level: "error", logger: "test", data: { message: "boom" } });
+
+      const written = JSON.parse(spy.mock.calls[0]?.[0] as string);
+      expect(written.SeverityNumber).toBe(17);
+      expect(written.SeverityText).toBe("ERROR");
+      expect(written.level).toBe("error");
+      expect(written.message).toBe("boom");
+      spy.mockRestore();
+    });
+  });
+
+  describe("McpProtocolTransport (deprecated)", () => {
+    function fakeServer(behaviour: () => Promise<void>) {
+      return { sendLoggingMessage: behaviour } as unknown as ConstructorParameters<
+        typeof McpProtocolTransport
+      >[0];
+    }
+
+    it("forwards a message to the client", async () => {
+      const sent: unknown[] = [];
+      const transport = new McpProtocolTransport(
+        fakeServer(async (...args: unknown[]) => {
+          sent.push(args[0]);
+        }) as never,
+        "debug"
+      );
+
+      await transport.write({ level: "info", logger: "test", data: { message: "hi" } });
+
+      expect(sent).toHaveLength(1);
+    });
+
+    // Over HTTP the send resolves and the message goes nowhere. A silent hole
+    // in the logs is worse than a noisy one, so say so - once.
+    it("warns once when delivery fails", async () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const transport = new McpProtocolTransport(
+        fakeServer(async () => {
+          throw new Error("not connected");
+        }) as never,
+        "debug"
+      );
+
+      await transport.write({ level: "info", logger: "t", data: { message: "a" } });
+      await transport.write({ level: "info", logger: "t", data: { message: "b" } });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const warning = JSON.parse(spy.mock.calls[0]?.[0] as string);
+      expect(warning.level).toBe("warning");
+      expect(warning.message).toContain("not being delivered");
+      spy.mockRestore();
+    });
+
+    it("respects the configured minimum level", () => {
+      const transport = new McpProtocolTransport(fakeServer(async () => {}) as never, "warning");
+
+      expect(transport.minLevel).toBe("warning");
+      transport.setMinLevel("debug");
+      expect(transport.minLevel).toBe("debug");
     });
   });
 });

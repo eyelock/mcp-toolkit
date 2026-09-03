@@ -12,15 +12,16 @@ import {
   type ClientMetadata,
   type SessionConfig,
   SessionFeaturesSchema,
+  SessionHandleSchema,
   SessionInitInputSchema,
 } from "@mcp-toolkit/model";
 import { getToolkitComponents } from "@mcp-toolkit/toolkit";
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { logDebug, logInfo } from "../logging.js";
 import type { ServerContext } from "../server.js";
-import { discoverClientMetadata } from "../strategy/client-discovery.js";
+import { clientDiscoverySpec } from "../strategy/client-discovery.js";
 import { executeWithDelegation, resolveToolDelegation } from "../strategy/index.js";
 
 /** Tool name for client discovery sub-task */
@@ -72,9 +73,13 @@ export async function handleSessionInit(
   const { projectName, features, clientMetadata, discoverClient = true } = input;
 
   // Check if session already exists
-  const hasSession = await context.provider.hasSession();
-  if (hasSession) {
-    const existing = await context.provider.getSession();
+  // Only a server with a default handle (stdio) can already have a session to
+  // clash with; over HTTP every session_init mints a fresh one.
+  const hasSession = context.sessionId
+    ? await context.provider.hasSession(context.sessionId)
+    : false;
+  if (hasSession && context.sessionId) {
+    const existing = await context.provider.getSession(context.sessionId);
     return {
       content: [
         {
@@ -121,14 +126,12 @@ export async function handleSessionInit(
     });
 
     const delegationResult = await executeWithDelegation(
-      context.server,
-      { timeout: delegation.delegationTimeout ?? 30_000 },
-      // Delegation function - ask the LLM about itself
-      async (server, delegateArgs) => {
-        return discoverClientMetadata(server, delegateArgs.timeout);
-      },
-      // Local function - we don't know locally, return null
-      async () => null,
+      context,
+      undefined,
+      // Ask the LLM about itself, and read its answer when it comes back
+      clientDiscoverySpec,
+      // Local function - we cannot know this locally
+      async () => undefined,
       {
         mode: delegation.mode,
         toolName: CLIENT_DISCOVERY_TOOL,
@@ -136,6 +139,13 @@ export async function handleSessionInit(
         fallbackEnabled: delegation.fallbackEnabled,
       }
     );
+
+    // Delegation is a round trip: hand the request back so the client can put
+    // it to the LLM, which then calls this tool again with the answer. Nothing
+    // has been written yet, so re-running from the top is safe.
+    if (delegationResult.outcome === "pending") {
+      return delegationResult.request as CallToolResult;
+    }
 
     if (delegationResult.outcome === "delegated" && delegationResult.result) {
       resolvedMetadata = delegationResult.result as ClientMetadata;
@@ -157,16 +167,19 @@ export async function handleSessionInit(
     }
   }
 
-  // Initialize session with resolved data
-  // Note: discoverClient is only used by the tool, not stored in session
+  // Initialize session with resolved data.
+  // discoverClient is a tool concern (already resolved above) and is absent
+  // from SessionCreateInput, so storage never sees it.
   const sessionInput = {
     projectName,
     features,
     clientMetadata: resolvedMetadata,
-    discoverClient: false, // Not relevant for storage, already processed above
   };
 
-  const result = await context.provider.initSession(sessionInput);
+  // The provider mints the handle when none is supplied. Over stdio the server
+  // has a default to reuse; over HTTP there is none, so a fresh one is minted
+  // here and returned for the caller to thread back.
+  const result = await context.provider.initSession(sessionInput, context.sessionId ?? undefined);
 
   if (!result.success) {
     return {
@@ -215,6 +228,9 @@ export async function handleSessionInit(
         text: [
           "Session initialized successfully!",
           "",
+          `session_id: ${session.sessionId}`,
+          "Pass this session_id to session_status, session_update and session_clear.",
+          "",
           `Server: ${identity.canonicalName}`,
           `Tags: ${tagsDisplay}`,
           `Project: ${session.projectName}`,
@@ -241,24 +257,46 @@ export async function handleSessionInit(
 }
 
 /**
+ * Explain that a handle is required, rather than silently acting on the wrong
+ * session or inventing one.
+ */
+function missingHandle(toolName: string): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          `${toolName} needs to know which session to act on, but no session_id was supplied ` +
+          "and this server has no default (that is normal over HTTP). Call session_init and " +
+          "pass the session_id it returns.",
+      },
+    ],
+    isError: true,
+  };
+}
+
+/**
  * Session Update Tool
  */
 export const sessionUpdateTool: Tool = {
   name: "session_update",
   description: "Update the current session configuration.",
-  inputSchema: z
-    .object({
-      projectName: z.string().optional().describe("New project name"),
-      features: SessionFeaturesSchema.partial().optional().describe("Features to update"),
-    })
-    .toJSONSchema() as Tool["inputSchema"],
+  inputSchema: SessionHandleSchema.extend({
+    projectName: z.string().optional().describe("New project name"),
+    features: SessionFeaturesSchema.partial().optional().describe("Features to update"),
+  }).toJSONSchema() as Tool["inputSchema"],
 };
 
 export async function handleSessionUpdate(
   args: unknown,
   context: ServerContext
 ): Promise<CallToolResult> {
-  const hasSession = await context.provider.hasSession();
+  const sessionId = context.sessionId;
+  if (!sessionId) {
+    return missingHandle("session_update");
+  }
+
+  const hasSession = await context.provider.hasSession(sessionId);
   if (!hasSession) {
     return {
       content: [
@@ -271,7 +309,9 @@ export async function handleSessionUpdate(
     };
   }
 
-  const result = await context.provider.updateSession(args as Record<string, unknown>);
+  // session_id addresses the session; it is not a field to write.
+  const { session_id: _handle, ...updates } = (args ?? {}) as Record<string, unknown>;
+  const result = await context.provider.updateSession(sessionId, updates);
 
   if (!result.success) {
     return {
@@ -301,17 +341,18 @@ export async function handleSessionUpdate(
 export const sessionClearTool: Tool = {
   name: "session_clear",
   description: "Clear the current session.",
-  inputSchema: {
-    type: "object",
-    properties: {},
-  },
+  inputSchema: SessionHandleSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 export async function handleSessionClear(
   _args: unknown,
   context: ServerContext
 ): Promise<CallToolResult> {
-  await context.provider.clearSession();
+  if (!context.sessionId) {
+    return missingHandle("session_clear");
+  }
+
+  await context.provider.clearSession(context.sessionId);
   return {
     content: [
       {
@@ -328,17 +369,18 @@ export async function handleSessionClear(
 export const sessionStatusTool: Tool = {
   name: "session_status",
   description: "Get the current session status and configuration.",
-  inputSchema: {
-    type: "object",
-    properties: {},
-  },
+  inputSchema: SessionHandleSchema.toJSONSchema() as Tool["inputSchema"],
 };
 
 export async function handleSessionStatus(
   _args: unknown,
   context: ServerContext
 ): Promise<CallToolResult> {
-  const result = await context.provider.getSession();
+  if (!context.sessionId) {
+    return missingHandle("session_status");
+  }
+
+  const result = await context.provider.getSession(context.sessionId);
 
   if (!result.data) {
     return {

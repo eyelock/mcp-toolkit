@@ -27,6 +27,7 @@ export {
   logToolRequest,
   logWarning,
   McpProtocolTransport,
+  OTEL_SEVERITY_NUMBER,
   removeMcpTransport,
   StderrTransport,
 } from "./spec/logging.js";

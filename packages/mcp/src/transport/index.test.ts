@@ -95,4 +95,44 @@ describe("Transport", () => {
       expect(options.httpConfig?.authToken).toBeUndefined();
     });
   });
+
+  describe("protocol era", () => {
+    it("serves both eras by default", () => {
+      expect(parseTransportArgs([]).rejectLegacy).toBe(false);
+      expect(parseTransportArgs(["--http"]).rejectLegacy).toBe(false);
+    });
+
+    it("rejects legacy clients with --modern-only", () => {
+      expect(parseTransportArgs(["--modern-only"]).rejectLegacy).toBe(true);
+      expect(parseTransportArgs(["--http", "--modern-only"]).rejectLegacy).toBe(true);
+    });
+  });
+
+  describe("allowed origins", () => {
+    it("leaves origins unset by default, so the transport applies its localhost default", () => {
+      expect(parseTransportArgs(["--http"]).httpConfig?.allowedOrigins).toBeUndefined();
+    });
+
+    it("parses a single origin", () => {
+      const options = parseTransportArgs(["--http", "--allow-origin", "https://app.example.com"]);
+      expect(options.httpConfig?.allowedOrigins).toEqual(["https://app.example.com"]);
+    });
+
+    it("parses a comma-separated list and trims it", () => {
+      const options = parseTransportArgs([
+        "--http",
+        "--allow-origin",
+        "https://a.example.com, https://b.example.com",
+      ]);
+      expect(options.httpConfig?.allowedOrigins).toEqual([
+        "https://a.example.com",
+        "https://b.example.com",
+      ]);
+    });
+
+    it("handles a missing origin value", () => {
+      const options = parseTransportArgs(["--http", "--allow-origin"]);
+      expect(options.httpConfig?.allowedOrigins).toBeUndefined();
+    });
+  });
 });

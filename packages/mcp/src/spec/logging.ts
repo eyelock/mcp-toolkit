@@ -8,7 +8,7 @@
  * @see https://datatracker.ietf.org/doc/html/rfc5424
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { Server } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 /**
@@ -78,6 +78,26 @@ export interface LogTransport {
 }
 
 /**
+ * RFC 5424 levels mapped to OpenTelemetry SeverityNumber.
+ *
+ * The spec replaces protocol logging with "OpenTelemetry for structured
+ * observability", so emitting the numeric severity means a collector can read
+ * these directly.
+ *
+ * @see https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-severitynumber
+ */
+export const OTEL_SEVERITY_NUMBER: Record<LogLevel, number> = {
+  debug: 5,
+  info: 9,
+  notice: 10,
+  warning: 13,
+  error: 17,
+  critical: 19,
+  alert: 21,
+  emergency: 23,
+};
+
+/**
  * Check if a level meets the minimum threshold
  */
 function meetsMinLevel(level: LogLevel, minLevel: LogLevel): boolean {
@@ -89,9 +109,17 @@ function meetsMinLevel(level: LogLevel, minLevel: LogLevel): boolean {
 // ============================================================================
 
 /**
- * Stderr transport - writes JSON to stderr
+ * Stderr transport - writes structured JSON to stderr.
  *
- * Always synchronous, never interferes with stdio MCP transport.
+ * The transport MCP `2026-07-28` points to: it works identically on stdio and
+ * HTTP, survives having no client attached, and is what container and
+ * serverless platforms already collect.
+ *
+ * Output carries OpenTelemetry-compatible fields (`SeverityNumber`,
+ * `SeverityText`, `Timestamp`) alongside the human-readable ones, so a
+ * collector can ingest it without a translation step.
+ *
+ * Always synchronous, and writes to stderr only - stdout carries the protocol.
  */
 export class StderrTransport implements LogTransport {
   readonly name = "stderr";
@@ -122,6 +150,9 @@ export class StderrTransport implements LogTransport {
       timestamp: message.data.timestamp ?? new Date().toISOString(),
       level: message.level,
       logger: message.logger,
+      // OpenTelemetry log-data model, so a collector needs no translation.
+      SeverityNumber: OTEL_SEVERITY_NUMBER[message.level],
+      SeverityText: message.level.toUpperCase(),
       ...message.data,
     };
 
@@ -140,14 +171,36 @@ export class StderrTransport implements LogTransport {
 }
 
 /**
- * MCP protocol transport - sends notifications to connected clients
+ * MCP protocol transport - sends `notifications/message` to the client.
  *
- * Uses server.sendLoggingMessage() per MCP spec.
+ * @deprecated MCP `2026-07-28` deprecates protocol logging (SEP-2577) in favour
+ * of stderr for stdio and OpenTelemetry for structured observability. It keeps
+ * working for at least twelve months, but new code should use
+ * {@link StderrTransport}.
+ *
+ * ## Where this actually delivers
+ *
+ * Measured, because the failure is silent rather than loud:
+ *
+ * | Transport | Era    | `sendLoggingMessage` | Client receives it |
+ * |-----------|--------|----------------------|--------------------|
+ * | stdio     | modern | resolves             | yes                |
+ * | stdio     | legacy | resolves             | yes                |
+ * | HTTP      | modern | resolves             | **no - dropped**   |
+ * | HTTP      | legacy | resolves             | **no - dropped**   |
+ *
+ * Over HTTP the call succeeds and the message goes nowhere: stateless
+ * per-request serving has no open stream to deliver a notification on. Nothing
+ * throws, so an operator would reasonably believe logging is working.
+ *
+ * This transport therefore warns once, to stderr, the first time a message is
+ * dropped - a silent hole in your logs is worse than a noisy one.
  */
 export class McpProtocolTransport implements LogTransport {
   readonly name = "mcp";
   private _minLevel: LogLevel;
   private server: Server;
+  private warnedUndeliverable = false;
 
   constructor(server: Server, minLevel: LogLevel = "info") {
     this.server = server;
@@ -169,9 +222,30 @@ export class McpProtocolTransport implements LogTransport {
         logger: message.logger,
         data: message.data,
       });
-    } catch {
-      // Silently fail - MCP transport may not be connected
+    } catch (error) {
+      this.warnUndeliverable(String(error));
     }
+  }
+
+  /**
+   * Say once, on stderr, that protocol logging is not reaching anyone.
+   */
+  private warnUndeliverable(reason: string): void {
+    if (this.warnedUndeliverable) {
+      return;
+    }
+    this.warnedUndeliverable = true;
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "warning",
+        logger: "mcp-toolkit",
+        message:
+          "Protocol log messages are not being delivered; add a StderrTransport so logs are not lost. " +
+          "Note that over HTTP they are dropped without error, so this warning may not appear at all.",
+        metadata: { transport: "mcp", reason },
+      })
+    );
   }
 }
 

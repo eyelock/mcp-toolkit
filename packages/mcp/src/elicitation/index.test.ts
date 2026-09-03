@@ -6,11 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  clientSupportsElicitation,
-  DEFAULT_ELICITATION_TIMEOUT_MS,
+  canElicit,
   ElicitationDeclinedError,
   ElicitationNotSupportedError,
-  ElicitationValidationError,
   // Example schemas
   EXAMPLE_SCHEMAS,
   elicitChoice,
@@ -18,7 +16,8 @@ import {
   // Re-exports from helpers
   elicitInput,
   elicitText,
-  getElicitationTimeout,
+  readResponse,
+  requestInput,
 } from "./index.js";
 
 describe("Elicitation Module", () => {
@@ -38,22 +37,19 @@ describe("Elicitation Module", () => {
     });
 
     it("exports utility functions", () => {
-      expect(clientSupportsElicitation).toBeDefined();
-      expect(typeof clientSupportsElicitation).toBe("function");
+      expect(canElicit).toBeDefined();
+      expect(typeof canElicit).toBe("function");
 
-      expect(getElicitationTimeout).toBeDefined();
-      expect(typeof getElicitationTimeout).toBe("function");
-    });
+      expect(readResponse).toBeDefined();
+      expect(typeof readResponse).toBe("function");
 
-    it("exports constants", () => {
-      // 5 minutes default timeout for elicitation
-      expect(DEFAULT_ELICITATION_TIMEOUT_MS).toBe(300_000);
+      expect(requestInput).toBeDefined();
+      expect(typeof requestInput).toBe("function");
     });
 
     it("exports error classes", () => {
       expect(ElicitationNotSupportedError).toBeDefined();
       expect(ElicitationDeclinedError).toBeDefined();
-      expect(ElicitationValidationError).toBeDefined();
     });
   });
 

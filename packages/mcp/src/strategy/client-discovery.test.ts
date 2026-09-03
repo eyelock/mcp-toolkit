@@ -1,302 +1,113 @@
 /**
- * Client Discovery Tests
+ * Client discovery, as a delegation round trip.
+ *
+ * `build` produces the question; `parse` reads the LLM's answer when the tool
+ * is called again. Neither half awaits anything, which is what lets delegation
+ * work on a stateless connection.
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   CLIENT_DISCOVERY_TIMEOUT_MS,
+  clientDiscoverySpec,
   createClientDiscoveryRequest,
-  discoverClientMetadata,
-  parseClientDiscoveryResponse,
 } from "./client-discovery.js";
 
-describe("Client Discovery", () => {
-  describe("parseClientDiscoveryResponse", () => {
-    it("parses valid JSON response", () => {
-      const response = JSON.stringify({
-        clientName: "claude-desktop",
-        clientVersion: "1.0.0",
-        model: "claude-opus-4-5-20251101",
-        modelProvider: "anthropic",
-        capabilities: {
-          supportsStreaming: true,
-          supportsImages: true,
-          supportsFunctionCalling: true,
-        },
-      });
-
-      const result = parseClientDiscoveryResponse(response);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("claude-desktop");
-      expect(result?.model).toBe("claude-opus-4-5-20251101");
-      expect(result?.modelProvider).toBe("anthropic");
-    });
-
-    it("parses JSON wrapped in markdown code block", () => {
-      const response = `\`\`\`json
-{
-  "clientName": "cursor",
-  "model": "gpt-4-turbo",
-  "modelProvider": "openai"
+/** Shape a sampling answer the way the SDK hands it back. */
+function samplingAnswer(text: string) {
+  return {
+    role: "assistant" as const,
+    model: "test-model",
+    content: { type: "text" as const, text },
+  } as Parameters<typeof clientDiscoverySpec.parse>[0];
 }
-\`\`\``;
 
-      const result = parseClientDiscoveryResponse(response);
+describe("clientDiscoverySpec.build", () => {
+  it("asks the LLM to identify itself", () => {
+    const request = clientDiscoverySpec.build(undefined);
 
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("cursor");
-      expect(result?.model).toBe("gpt-4-turbo");
-    });
+    expect(request.messages).toHaveLength(1);
+    expect(request.messages[0]?.role).toBe("user");
+    const content = request.messages[0]?.content as { text: string };
+    expect(content.text).toContain("clientName");
+    expect(content.text).toContain("model");
+  });
 
-    it("parses JSON wrapped in plain code block", () => {
-      const response = `\`\`\`
-{
-  "clientName": "vscode",
-  "model": "claude-sonnet-4-20250514"
-}
-\`\`\``;
+  it("bounds the response", () => {
+    expect(clientDiscoverySpec.build(undefined).maxTokens).toBe(500);
+  });
 
-      const result = parseClientDiscoveryResponse(response);
+  it("uses a stable key so the answer can be matched to the question", () => {
+    expect(clientDiscoverySpec.key).toBe("client_discovery");
+  });
+});
 
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("vscode");
-    });
+describe("clientDiscoverySpec.parse", () => {
+  it("returns metadata from a well-formed answer", () => {
+    const parsed = clientDiscoverySpec.parse(
+      samplingAnswer(
+        JSON.stringify({
+          clientName: "claude-desktop",
+          model: "claude-opus-5",
+          modelProvider: "anthropic",
+        })
+      ),
+      undefined
+    );
 
-    it("handles minimal valid response", () => {
-      const response = JSON.stringify({
-        clientName: "test-client",
-      });
-
-      const result = parseClientDiscoveryResponse(response);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("test-client");
-    });
-
-    it("returns null for invalid JSON", () => {
-      const result = parseClientDiscoveryResponse("not valid json");
-
-      expect(result).toBeNull();
-    });
-
-    it("returns null for empty string", () => {
-      const result = parseClientDiscoveryResponse("");
-
-      expect(result).toBeNull();
-    });
-
-    it("accepts empty object (all fields optional in schema)", () => {
-      // ClientMetadataSchema has all fields optional
-      const response = JSON.stringify({});
-
-      const result = parseClientDiscoveryResponse(response);
-
-      // Empty object is valid since all fields are optional
-      expect(result).toEqual({});
-    });
-
-    it("strips unknown fields", () => {
-      const response = JSON.stringify({
-        clientName: "test",
-        unknownField: "should be stripped",
-      });
-
-      const result = parseClientDiscoveryResponse(response);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("test");
-      expect(result).not.toHaveProperty("unknownField");
-    });
-
-    it("returns null for invalid field types", () => {
-      // clientName must be a string if provided
-      const response = JSON.stringify({
-        clientName: 12345,
-      });
-
-      const result = parseClientDiscoveryResponse(response);
-
-      expect(result).toBeNull();
-    });
-
-    it("handles whitespace around response", () => {
-      const response = `
-        {
-          "clientName": "whitespace-test"
-        }
-      `;
-
-      const result = parseClientDiscoveryResponse(response);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("whitespace-test");
+    expect(parsed).toMatchObject({
+      clientName: "claude-desktop",
+      model: "claude-opus-5",
+      modelProvider: "anthropic",
     });
   });
 
-  describe("createClientDiscoveryRequest", () => {
-    it("returns properly structured request", () => {
-      const request = createClientDiscoveryRequest();
+  it("handles a markdown code block", () => {
+    const parsed = clientDiscoverySpec.parse(
+      samplingAnswer('```json\n{"clientName": "cursor"}\n```'),
+      undefined
+    );
 
-      expect(request).toHaveProperty("messages");
-      expect(request).toHaveProperty("maxTokens");
-      expect(request.maxTokens).toBe(500);
-    });
-
-    it("includes single user message", () => {
-      const request = createClientDiscoveryRequest();
-
-      expect(request.messages).toHaveLength(1);
-      expect(request.messages[0].role).toBe("user");
-      expect(request.messages[0].content.type).toBe("text");
-    });
-
-    it("message contains discovery prompt", () => {
-      const request = createClientDiscoveryRequest();
-
-      const text = request.messages[0].content.text;
-      expect(text).toContain("clientName");
-      expect(text).toContain("model");
-      expect(text).toContain("modelProvider");
-      expect(text).toContain("JSON");
-    });
+    expect(parsed).toMatchObject({ clientName: "cursor" });
   });
 
-  describe("discoverClientMetadata", () => {
-    it("returns null when sampling is not supported", async () => {
-      const mockServer = {} as unknown as Server;
+  it("handles an unlabelled code block", () => {
+    const parsed = clientDiscoverySpec.parse(
+      samplingAnswer('```\n{"clientName": "vscode"}\n```'),
+      undefined
+    );
 
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).toBeNull();
-    });
-
-    it("returns null when server has no sampling capability", async () => {
-      const mockServer = {
-        _clientCapabilities: { tools: {} },
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).toBeNull();
-    });
-
-    it("returns metadata on successful discovery", async () => {
-      const mockResponse = {
-        role: "assistant",
-        model: "test",
-        content: JSON.stringify({
-          clientName: "test-client",
-          model: "test-model",
-          modelProvider: "test-provider",
-        }),
-      };
-
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockResolvedValue(mockResponse),
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("test-client");
-      expect(result?.model).toBe("test-model");
-    });
-
-    it("returns null when createMessage throws", async () => {
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockRejectedValue(new Error("Network error")),
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).toBeNull();
-    });
-
-    it("returns null when response has invalid field types", async () => {
-      const mockResponse = {
-        role: "assistant",
-        model: "test",
-        // clientName must be a string, not a number
-        content: JSON.stringify({ clientName: 12345 }),
-      };
-
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockResolvedValue(mockResponse),
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).toBeNull();
-    });
-
-    it("returns empty object for unknown fields (all fields optional)", async () => {
-      const mockResponse = {
-        role: "assistant",
-        model: "test",
-        // Unknown fields get stripped, leaving empty object
-        content: JSON.stringify({ unknownField: "value" }),
-      };
-
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockResolvedValue(mockResponse),
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      // Empty object is valid since all fields are optional
-      expect(result).toEqual({});
-    });
-
-    it("handles markdown code block in response", async () => {
-      const mockResponse = {
-        role: "assistant",
-        model: "test",
-        content: `\`\`\`json
-{
-  "clientName": "code-block-client",
-  "model": "code-block-model"
-}
-\`\`\``,
-      };
-
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockResolvedValue(mockResponse),
-      } as unknown as Server;
-
-      const result = await discoverClientMetadata(mockServer);
-
-      expect(result).not.toBeNull();
-      expect(result?.clientName).toBe("code-block-client");
-    });
-
-    it("uses custom timeout when provided", async () => {
-      const mockResponse = {
-        role: "assistant",
-        model: "test",
-        content: JSON.stringify({ clientName: "timeout-test" }),
-      };
-
-      const mockServer = {
-        _clientCapabilities: { sampling: {} },
-        createMessage: vi.fn().mockResolvedValue(mockResponse),
-      } as unknown as Server;
-
-      await discoverClientMetadata(mockServer, 60000);
-
-      expect(mockServer.createMessage).toHaveBeenCalledWith(expect.any(Object), { timeout: 60000 });
-    });
+    expect(parsed).toMatchObject({ clientName: "vscode" });
   });
 
-  describe("Constants", () => {
-    it("exports default discovery timeout", () => {
-      expect(CLIENT_DISCOVERY_TIMEOUT_MS).toBe(30_000);
-    });
+  it("accepts an empty object, since every field is optional", () => {
+    expect(clientDiscoverySpec.parse(samplingAnswer("{}"), undefined)).toEqual({});
+  });
+
+  // undefined means "unusable answer", which the executor treats as a failed
+  // delegation and falls back from.
+  it("is undefined for unparseable text", () => {
+    expect(clientDiscoverySpec.parse(samplingAnswer("not json at all"), undefined)).toBeUndefined();
+  });
+
+  it("is undefined when a field has the wrong type", () => {
+    expect(
+      clientDiscoverySpec.parse(samplingAnswer('{"clientName": 12345}'), undefined)
+    ).toBeUndefined();
+  });
+});
+
+describe("createClientDiscoveryRequest", () => {
+  it("still builds the same request for manual flows", () => {
+    const request = createClientDiscoveryRequest();
+
+    expect(request.messages[0]?.content.text).toContain("clientName");
+    expect(request.maxTokens).toBeGreaterThan(0);
+  });
+});
+
+describe("constants", () => {
+  it("exposes a discovery timeout", () => {
+    expect(CLIENT_DISCOVERY_TIMEOUT_MS).toBe(30_000);
   });
 });

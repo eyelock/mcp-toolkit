@@ -1,104 +1,119 @@
 /**
  * Elicitation Module
  *
- * Provides utilities for interactive user input via MCP elicitation.
- *
- * Elicitation enables servers to request structured input from users through
- * the client, allowing for interactive workflows where the LLM doesn't have
- * all the necessary information.
+ * Requesting structured input from users, for workflows where the LLM does not
+ * have everything it needs.
  *
  * ## Key Concepts
  *
- * - **Form-based elicitation**: Server sends a JSON schema, client presents a form
- * - **Typed responses**: Results are typed based on the schema you provide
- * - **User actions**: Users can accept (submit), decline, or cancel
+ * - **Pull, not push**: `2026-07-28` removed server-to-client requests. A
+ *   handler *returns* a description of what it needs and is called again with
+ *   the answers, so any instance can serve the retry.
+ * - **Read first, ask second**: every helper checks for an answer already
+ *   supplied before asking for one, so a handler is written once and runs on
+ *   both rounds.
+ * - **Typed responses**: results are typed from the schema you provide, and
+ *   validated before they reach you.
  *
  * ## Usage Examples
  *
- * ### Simple text input
- * ```typescript
- * import { elicitText } from "./elicitation/index.js";
- *
- * const name = await elicitText(server, "What is your name?", {
- *   title: "Name",
- *   description: "Enter your full name"
- * });
- * ```
- *
- * ### Confirmation dialog
+ * ### Confirmation
  * ```typescript
  * import { elicitConfirmation } from "./elicitation/index.js";
  *
- * const { confirmed } = await elicitConfirmation(
- *   server,
- *   "Are you sure you want to delete this item?"
- * );
+ * export async function handleDelete(args, context) {
+ *   const confirm = elicitConfirmation(context, "confirm", "Delete this item?");
+ *   if (confirm.status === "pending") {
+ *     return confirm.result;
+ *   }
+ *   if (!confirm.value) {
+ *     return { content: [{ type: "text", text: "Cancelled." }] };
+ *   }
+ *   return doDelete(args);
+ * }
+ * ```
+ *
+ * ### Text input
+ * ```typescript
+ * const name = elicitText(context, "name", "What is your name?", {
+ *   description: "Enter your full name",
+ * });
+ * if (name.status === "pending") return name.result;
+ * // name.value is a string
  * ```
  *
  * ### Choice from options
  * ```typescript
- * import { elicitChoice } from "./elicitation/index.js";
- *
- * const priority = await elicitChoice(server, "Select priority:", [
+ * const priority = elicitChoice(context, "priority", "Select priority:", [
  *   { value: "low", label: "Low" },
  *   { value: "medium", label: "Medium" },
- *   { value: "high", label: "High" }
+ *   { value: "high", label: "High" },
  * ]);
+ * if (priority.status === "pending") return priority.result;
+ * // priority.value is "low" | "medium" | "high"
  * ```
  *
  * ### Custom form
  * ```typescript
- * import { elicitInput } from "./elicitation/index.js";
- *
- * interface TaskInput {
+ * interface TaskInput extends Record<string, unknown> {
  *   title: string;
- *   description?: string;
  *   priority: "low" | "medium" | "high";
  * }
  *
- * const result = await elicitInput<TaskInput>(server, "Create a new task:", {
+ * const task = elicitInput<TaskInput>(context, "task", "Create a new task:", {
  *   type: "object",
  *   properties: {
  *     title: { type: "string", title: "Title", minLength: 1 },
- *     description: { type: "string", title: "Description" },
- *     priority: {
- *       type: "string",
- *       title: "Priority",
- *       enum: ["low", "medium", "high"],
- *       default: "medium"
- *     }
+ *     priority: { type: "string", title: "Priority", enum: ["low", "medium", "high"] },
  *   },
- *   required: ["title", "priority"]
+ *   required: ["title", "priority"],
  * });
+ * if (task.status === "pending") return task.result;
+ * console.log(`Creating task: ${task.value.title}`);
+ * ```
  *
- * if (result.action === "accept" && result.content) {
- *   console.log(`Creating task: ${result.content.title}`);
+ * ### Several questions in one round trip
+ * ```typescript
+ * import { readResponse, requestInput } from "./elicitation/index.js";
+ * import { inputRequired } from "@modelcontextprotocol/server";
+ *
+ * const name = readResponse<{ value: string }>(context, "name");
+ * const team = readResponse<{ value: string }>(context, "team");
+ * if (!name || !team) {
+ *   return requestInput({
+ *     name: inputRequired.elicit({ message: "Your name?", requestedSchema: textSchema }),
+ *     team: inputRequired.elicit({ message: "Your team?", requestedSchema: textSchema }),
+ *   });
  * }
  * ```
  *
- * @see https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
+ * @see https://modelcontextprotocol.io/specification/2026-07-28
  */
 
 // Core helpers
 export {
-  // Utility functions
-  clientSupportsElicitation,
-  // Constants
-  DEFAULT_ELICITATION_TIMEOUT_MS,
+  // Capability check
+  canElicit,
+  carryForward,
+  choiceRequest,
+  confirmationRequest,
   ElicitationDeclinedError,
   // Errors
   ElicitationNotSupportedError,
   type ElicitationSchema,
-  ElicitationValidationError,
   type ElicitOptions,
+  // Outcome type - handlers branch on `status`
+  type ElicitOutcome,
+  elicitAll,
   elicitChoice,
   elicitConfirmation,
   // Main functions
   elicitInput,
   elicitText,
-  getElicitationTimeout,
-  // Types
-  type TypedElicitResult,
+  // Lower-level building blocks
+  readResponse,
+  requestInput,
+  textRequest,
 } from "./helpers.js";
 
 /**

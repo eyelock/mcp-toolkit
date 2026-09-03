@@ -1,408 +1,443 @@
 /**
  * Elicitation Helpers for MCP
  *
- * Provides utilities for requesting user input through MCP elicitation.
- * Elicitation allows the server to gather structured input from users
- * mid-operation, enabling interactive workflows.
+ * Requesting structured input from the user, mid-operation.
  *
- * @see https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
+ * ## Push became pull
+ *
+ * Under 2025-era MCP the server *pushed* a question down a live connection and
+ * awaited the answer:
+ *
+ * ```typescript
+ * const answer = await server.elicitInput({ ... }); // throws on 2026-07-28
+ * ```
+ *
+ * `2026-07-28` removed server-to-client requests, so that call now throws on a
+ * modern connection. Instead the handler *returns* an `InputRequiredResult`
+ * describing what it needs; the client gathers the answers and calls the tool
+ * again with them attached. Any instance can serve the retry, because
+ * everything needed travels in the payload.
+ *
+ * Handlers therefore read first and ask second:
+ *
+ * ```typescript
+ * export async function handleDeploy(args, context) {
+ *   const confirm = elicitConfirmation(context, "confirm", "Deploy to production?");
+ *   if (confirm.status === "pending") {
+ *     return confirm.result; // client will call us again with the answer
+ *   }
+ *   return deploy(confirm.value);
+ * }
+ * ```
+ *
+ * ## What still works where
+ *
+ * | Transport | Era    | Elicitation |
+ * |-----------|--------|-------------|
+ * | stdio     | modern | yes         |
+ * | stdio     | legacy | yes - the SDK shim turns the return into a 2025 push |
+ * | HTTP      | modern | yes         |
+ * | HTTP      | legacy | **no** - stateless per-request serving has no channel to push on |
+ *
+ * The last row is a property of stateless HTTP, not of this code: there is no
+ * open connection to carry a server-to-client request. Legacy HTTP clients
+ * needing elicitation must use stdio or upgrade.
+ *
+ * ## Answers do not accumulate
+ *
+ * `inputResponses` carries only the answers to the requests issued in the round
+ * immediately before. Ask for A, then ask for B, and by the time B arrives A is
+ * gone - a handler that re-asks for what it cannot see will loop until the
+ * SDK's `maxRounds` cap fires.
+ *
+ * There are two correct shapes, and the first is almost always the right one:
+ *
+ * 1. **Ask for everything in one round** - `elicitAll`. All answers arrive
+ *    together, nothing needs remembering.
+ * 2. **Carry earlier answers forward** - `carryForward`, which signs them into
+ *    `requestState`. Needed only when a later question depends on an earlier
+ *    answer. Requires `requestStateKey` on the server.
+ *
+ * @see https://modelcontextprotocol.io/specification/2026-07-28
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
-import { logDebug, logError, logWarning } from "../logging.js";
+import {
+  acceptedContent,
+  type ElicitInputParams,
+  type InputRequest,
+  type InputRequiredResult,
+  inputRequired,
+} from "@modelcontextprotocol/server";
+import { z } from "zod";
+import type { ServerContext } from "../server.js";
 
 /**
- * Default timeout for elicitation requests (5 minutes).
- * Generous because humans need time to read and fill out forms.
- * Override via MCP_ELICITATION_TIMEOUT_MS environment variable.
+ * Either the answer, or the result to return so the client supplies it.
+ *
+ * Handlers branch on `status`: `"pending"` means return `result` and wait to be
+ * called again; `"ready"` means `value` is available.
  */
-export const DEFAULT_ELICITATION_TIMEOUT_MS = 5 * 60 * 1000;
+export type ElicitOutcome<T> =
+  | { status: "ready"; value: T }
+  | { status: "pending"; result: InputRequiredResult };
 
 /**
- * Gets the configured elicitation timeout in milliseconds.
- * Priority: options.timeout > MCP_ELICITATION_TIMEOUT_MS env var > default (5 minutes)
+ * Schema shape elicitation accepts: a flat object of primitives.
+ *
+ * Derived from the SDK rather than restated, so it cannot drift from what the
+ * protocol actually allows.
  */
-export function getElicitationTimeout(optionsTimeout?: number): number {
-  if (optionsTimeout !== undefined) {
-    return optionsTimeout;
-  }
-
-  const envTimeout = process.env.MCP_ELICITATION_TIMEOUT_MS;
-  if (envTimeout) {
-    const parsed = Number.parseInt(envTimeout, 10);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-
-  return DEFAULT_ELICITATION_TIMEOUT_MS;
-}
+export type ElicitationSchema = ElicitInputParams["requestedSchema"];
 
 /**
- * Result of an elicitation request with typed content
- */
-export interface TypedElicitResult<T> {
-  /** User action: accept, decline, or cancel */
-  action: "accept" | "decline" | "cancel";
-  /** User-provided content (only present when action is 'accept') */
-  content?: T;
-}
-
-/**
- * Options for elicitation requests
+ * Options shared by the helpers
  */
 export interface ElicitOptions {
-  /** Timeout in milliseconds */
-  timeout?: number;
-  /** Whether to log the elicitation event */
-  logEvent?: boolean;
+  /**
+   * Opaque state echoed back by the client on the retry.
+   *
+   * Use it to carry progress through a multi-step flow. It round-trips through
+   * an untrusted client, so sign it (`createRequestStateCodec`) if anything is
+   * decided by its contents.
+   */
+  requestState?: string;
 }
 
 /**
- * JSON Schema for elicitation form fields
+ * Read an answer this handler previously asked for, if it has arrived.
  *
- * Supports: string, boolean, number/integer, and enum fields
+ * @returns the accepted content, or undefined on the first round (and when the
+ *          user declined or cancelled)
  */
-export interface ElicitationSchema {
-  type: "object";
-  properties: Record<
-    string,
-    | {
-        type: "string";
-        title?: string;
-        description?: string;
-        minLength?: number;
-        maxLength?: number;
-        format?: "date" | "uri" | "email" | "date-time";
-        default?: string;
-      }
-    | {
-        type: "string";
-        title?: string;
-        description?: string;
-        enum: string[];
-        enumNames?: string[];
-        default?: string;
-      }
-    | {
-        type: "boolean";
-        title?: string;
-        description?: string;
-        default?: boolean;
-      }
-    | {
-        type: "number" | "integer";
-        title?: string;
-        description?: string;
-        minimum?: number;
-        maximum?: number;
-        default?: number;
-      }
-  >;
-  required?: string[];
+export function readResponse<T extends Record<string, unknown>>(
+  context: Pick<ServerContext, "inputResponses">,
+  key: string
+): T | undefined {
+  return acceptedContent<T>(context.inputResponses, key);
 }
 
 /**
- * Checks if the connected client supports elicitation
+ * Build the result that asks the client for input.
  *
- * @param server - MCP Server instance
- * @returns true if client supports form elicitation
+ * Compose several requests in one round trip by passing more than one entry.
  */
-export function clientSupportsElicitation(server: Server): boolean {
-  const capabilities = (
-    server as unknown as {
-      _clientCapabilities?: { elicitation?: { form?: unknown } };
-    }
-  )._clientCapabilities;
-  return Boolean(capabilities?.elicitation?.form);
+export function requestInput(
+  requests: Record<string, InputRequest>,
+  options: ElicitOptions = {}
+): InputRequiredResult {
+  return inputRequired({
+    inputRequests: requests,
+    ...(options.requestState === undefined ? {} : { requestState: options.requestState }),
+  });
 }
 
 /**
- * Elicits structured input from the user
+ * Generic form elicitation against a JSON Schema.
  *
- * This is the main function for requesting user input. It handles:
- * - Capability checking
- * - Timeout configuration
- * - Error handling
- * - Logging
- *
- * @param server - MCP Server instance
- * @param message - Message to display to the user
- * @param schema - JSON Schema defining the expected input structure
- * @param options - Additional options
- * @returns Typed elicitation result
- *
- * @example
- * ```typescript
- * const result = await elicitInput<{ name: string; age: number }>(
- *   server,
- *   "Please provide your details:",
- *   {
- *     type: "object",
- *     properties: {
- *       name: { type: "string", title: "Name", description: "Your full name" },
- *       age: { type: "integer", title: "Age", minimum: 0, maximum: 150 }
- *     },
- *     required: ["name"]
- *   }
- * );
- *
- * if (result.action === 'accept' && result.content) {
- *   console.log(`Hello ${result.content.name}!`);
- * }
- * ```
+ * @param context - Handler context (carries any answers already supplied)
+ * @param key - Names this request, and the answer that comes back
+ * @param message - Prompt shown to the user
+ * @param schema - Shape of the requested input
  */
-export async function elicitInput<T>(
-  server: Server,
+export function elicitInput<T extends Record<string, unknown>>(
+  context: Pick<ServerContext, "inputResponses">,
+  key: string,
   message: string,
   schema: ElicitationSchema,
-  options?: ElicitOptions
-): Promise<TypedElicitResult<T>> {
-  const { logEvent = true } = options ?? {};
-  const timeout = getElicitationTimeout(options?.timeout);
-
-  // Check if client supports elicitation
-  if (!clientSupportsElicitation(server)) {
-    if (logEvent) {
-      logWarning("Client does not support elicitation", {
-        metadata: { feature: "elicitation" },
-      });
-    }
-    throw new ElicitationNotSupportedError("Client does not support form elicitation");
+  options: ElicitOptions = {}
+): ElicitOutcome<T> {
+  const existing = readResponse<T>(context, key);
+  if (existing) {
+    return { status: "ready", value: existing };
   }
 
-  if (logEvent) {
-    logDebug(`Elicitation: Requesting input: ${message}`, {
-      metadata: { feature: "elicitation" },
-    });
-  }
-
-  try {
-    // Build the elicitation params - cast to any to handle SDK type strictness
-    const params = {
-      mode: "form" as const,
-      message,
-      requestedSchema: schema,
-    };
-
-    // biome-ignore lint/suspicious/noExplicitAny: SDK types are stricter than our schema type
-    const result: ElicitResult = await server.elicitInput(params as any, { timeout });
-
-    if (logEvent) {
-      logDebug(`Elicitation: User action: ${result.action}`, {
-        metadata: { feature: "elicitation", action: result.action },
-      });
-    }
-
-    return {
-      action: result.action,
-      content: result.content as T | undefined,
-    };
-  } catch (error) {
-    if (logEvent) {
-      logError(`Elicitation failed: ${String(error)}`, error instanceof Error ? error : undefined, {
-        metadata: { feature: "elicitation" },
-      });
-    }
-    throw error;
-  }
+  return {
+    status: "pending",
+    result: requestInput(
+      { [key]: inputRequired.elicit({ message, requestedSchema: schema }) },
+      options
+    ),
+  };
 }
 
 /**
- * Elicits confirmation from the user (yes/no with optional reason)
- *
- * @param server - MCP Server instance
- * @param message - Confirmation message to display
- * @param options - Additional options
- * @returns Confirmation result
- *
- * @example
- * ```typescript
- * const { confirmed, reason } = await elicitConfirmation(
- *   server,
- *   "Are you sure you want to delete this item?"
- * );
- *
- * if (confirmed) {
- *   await deleteItem();
- * } else if (reason) {
- *   console.log(`Deletion cancelled: ${reason}`);
- * }
- * ```
+ * Ask a yes/no question.
  */
-export async function elicitConfirmation(
-  server: Server,
+export function elicitConfirmation(
+  context: Pick<ServerContext, "inputResponses">,
+  key: string,
   message: string,
-  options?: ElicitOptions
-): Promise<{ confirmed: boolean; reason?: string }> {
-  const schema: ElicitationSchema = {
-    type: "object",
-    properties: {
-      confirm: {
-        type: "boolean",
-        title: "Confirm",
-        description: "Confirm this action?",
-      },
-      reason: {
-        type: "string",
-        title: "Reason",
-        description: "Optional reason for your decision",
-      },
-    },
-    required: ["confirm"],
-  };
-
-  const result = await elicitInput<{ confirm: boolean; reason?: string }>(
-    server,
+  options: ElicitOptions = {}
+): ElicitOutcome<boolean> {
+  const outcome = elicitInput<{ confirm: boolean }>(
+    context,
+    key,
     message,
-    schema,
+    {
+      type: "object",
+      properties: {
+        confirm: { type: "boolean", description: "Confirm this action" },
+      },
+      required: ["confirm"],
+    },
     options
   );
 
-  if (result.action === "accept" && result.content) {
-    return {
-      confirmed: result.content.confirm,
-      reason: result.content.reason,
-    };
-  }
-
-  // Decline or cancel means not confirmed
-  return { confirmed: false };
+  return outcome.status === "ready"
+    ? { status: "ready", value: outcome.value.confirm === true }
+    : outcome;
 }
 
 /**
- * Elicits a text input from the user
+ * Ask for a single line of text.
+ */
+export function elicitText(
+  context: Pick<ServerContext, "inputResponses">,
+  key: string,
+  message: string,
+  options: ElicitOptions & { description?: string } = {}
+): ElicitOutcome<string> {
+  const outcome = elicitInput<{ value: string }>(
+    context,
+    key,
+    message,
+    {
+      type: "object",
+      properties: {
+        value: {
+          type: "string",
+          ...(options.description === undefined ? {} : { description: options.description }),
+        },
+      },
+      required: ["value"],
+    },
+    options
+  );
+
+  return outcome.status === "ready" ? { status: "ready", value: outcome.value.value } : outcome;
+}
+
+/**
+ * Ask the user to pick one of a fixed set of options.
  *
- * @param server - MCP Server instance
- * @param message - Message to display
- * @param fieldConfig - Configuration for the text field
- * @param options - Additional options
- * @returns The text value or undefined if cancelled
+ * The chosen value is validated against `choices`, so a client that answers
+ * with something else is treated as not having answered - the request is
+ * re-issued rather than a bogus value being trusted.
+ */
+export function elicitChoice<T extends string>(
+  context: Pick<ServerContext, "inputResponses">,
+  key: string,
+  message: string,
+  choices: ReadonlyArray<{ value: T; label?: string }>,
+  options: ElicitOptions = {}
+): ElicitOutcome<T> {
+  const values = choices.map((choice) => choice.value);
+  const schema = z.object({ choice: z.enum(values as [T, ...T[]]) });
+
+  const existing = acceptedContent(context.inputResponses, key, schema);
+  if (existing) {
+    return { status: "ready", value: existing.choice as T };
+  }
+
+  return {
+    status: "pending",
+    result: requestInput(
+      {
+        [key]: inputRequired.elicit({
+          message,
+          requestedSchema: {
+            type: "object",
+            properties: {
+              choice: {
+                type: "string",
+                enum: values,
+                description: choices
+                  .map((choice) => `${choice.value}${choice.label ? ` (${choice.label})` : ""}`)
+                  .join(", "),
+              },
+            },
+            required: ["choice"],
+          },
+        }),
+      },
+      options
+    ),
+  };
+}
+
+/**
+ * Build a request for a single line of text, for use with `elicitAll`.
+ */
+export function textRequest(message: string, description?: string): InputRequest {
+  return inputRequired.elicit({
+    message,
+    requestedSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string", ...(description === undefined ? {} : { description }) },
+      },
+      required: ["value"],
+    },
+  });
+}
+
+/**
+ * Build a yes/no request, for use with `elicitAll`.
+ */
+export function confirmationRequest(message: string): InputRequest {
+  return inputRequired.elicit({
+    message,
+    requestedSchema: {
+      type: "object",
+      properties: { confirm: { type: "boolean", description: "Confirm this action" } },
+      required: ["confirm"],
+    },
+  });
+}
+
+/**
+ * Build a pick-one request, for use with `elicitAll`.
+ */
+export function choiceRequest(
+  message: string,
+  choices: ReadonlyArray<{ value: string; label?: string }>
+): InputRequest {
+  return inputRequired.elicit({
+    message,
+    requestedSchema: {
+      type: "object",
+      properties: {
+        choice: {
+          type: "string",
+          enum: choices.map((choice) => choice.value),
+          description: choices
+            .map((choice) => `${choice.value}${choice.label ? ` (${choice.label})` : ""}`)
+            .join(", "),
+        },
+      },
+      required: ["choice"],
+    },
+  });
+}
+
+/**
+ * Ask several questions in a single round.
+ *
+ * The preferred shape for multi-field input: every answer arrives together, so
+ * nothing has to be remembered between rounds.
  *
  * @example
  * ```typescript
- * const name = await elicitText(server, "What is your name?", {
- *   title: "Name",
- *   description: "Enter your full name",
- *   minLength: 1,
- *   maxLength: 100
+ * const answers = elicitAll(context, {
+ *   name: textRequest("Your name?"),
+ *   team: textRequest("Your team?"),
  * });
+ * if (answers.status === "pending") return answers.result;
+ * // answers.value.name.value, answers.value.team.value
  * ```
  */
-export async function elicitText(
-  server: Server,
-  message: string,
-  fieldConfig?: {
-    title?: string;
-    description?: string;
-    minLength?: number;
-    maxLength?: number;
-    default?: string;
-  },
-  options?: ElicitOptions
-): Promise<string | undefined> {
-  const schema: ElicitationSchema = {
-    type: "object",
-    properties: {
-      value: {
-        type: "string",
-        title: fieldConfig?.title ?? "Value",
-        description: fieldConfig?.description,
-        minLength: fieldConfig?.minLength,
-        maxLength: fieldConfig?.maxLength,
-        default: fieldConfig?.default,
-      },
-    },
-    required: ["value"],
-  };
+export function elicitAll<T extends Record<string, Record<string, unknown>>>(
+  context: Pick<ServerContext, "inputResponses">,
+  requests: Record<keyof T & string, InputRequest>,
+  options: ElicitOptions = {}
+): ElicitOutcome<T> {
+  const answers: Record<string, Record<string, unknown>> = {};
+  const outstanding: Record<string, InputRequest> = {};
 
-  const result = await elicitInput<{ value: string }>(server, message, schema, options);
-
-  if (result.action === "accept" && result.content) {
-    return result.content.value;
+  for (const [key, request] of Object.entries(requests)) {
+    const answer = readResponse(context, key);
+    if (answer) {
+      answers[key] = answer;
+    } else {
+      outstanding[key] = request;
+    }
   }
 
-  return undefined;
+  if (Object.keys(outstanding).length > 0) {
+    return { status: "pending", result: requestInput(outstanding, options) };
+  }
+
+  return { status: "ready", value: answers as T };
 }
 
 /**
- * Elicits a choice from a list of options
+ * Merge answers carried from earlier rounds with the ones that just arrived.
  *
- * @param server - MCP Server instance
- * @param message - Message to display
- * @param choices - List of choices
- * @param options - Additional options
- * @returns The selected choice or undefined if cancelled
+ * Use when a later question depends on an earlier answer, so the questions
+ * cannot all be asked at once. The merged view is what the helpers should read,
+ * and `remember` produces the state to carry into the next round.
+ *
+ * The carried state is signed by the server's `requestStateKey`, so a client
+ * cannot forge an answer it never gave.
  *
  * @example
  * ```typescript
- * const priority = await elicitChoice(
- *   server,
- *   "Select priority level:",
- *   [
- *     { value: "low", label: "Low" },
- *     { value: "medium", label: "Medium" },
- *     { value: "high", label: "High" }
- *   ]
- * );
+ * const carried = carryForward(context);
+ *
+ * const env = elicitChoice(carried.context, "env", "Which environment?", ENVS);
+ * if (env.status === "pending") return await carried.remember(env.result);
+ *
+ * // Only ask this once the environment is known.
+ * const confirm = elicitConfirmation(carried.context, "confirm", `Deploy to ${env.value}?`);
+ * if (confirm.status === "pending") return await carried.remember(confirm.result);
  * ```
  */
-export async function elicitChoice<T extends string>(
-  server: Server,
-  message: string,
-  choices: Array<{ value: T; label: string }>,
-  options?: ElicitOptions & { title?: string; description?: string }
-): Promise<T | undefined> {
-  const schema: ElicitationSchema = {
-    type: "object",
-    properties: {
-      choice: {
-        type: "string",
-        title: options?.title ?? "Choice",
-        description: options?.description,
-        enum: choices.map((c) => c.value),
-        enumNames: choices.map((c) => c.label),
-      },
+export function carryForward(
+  context: Pick<ServerContext, "inputResponses" | "carriedState" | "mintRequestState">
+): {
+  /** Context whose `inputResponses` include everything answered so far */
+  context: Pick<ServerContext, "inputResponses">;
+  /** Attach the accumulated answers to a pending result */
+  remember: (result: InputRequiredResult) => Promise<InputRequiredResult>;
+} {
+  const carried = (context.carriedState?.answers ?? {}) as Record<string, unknown>;
+  const arrived = (context.inputResponses ?? {}) as Record<string, unknown>;
+  const merged = { ...carried, ...arrived };
+
+  return {
+    context: { inputResponses: merged },
+    remember: async (result) => {
+      if (!context.mintRequestState) {
+        throw new ElicitationNotSupportedError(
+          "Multi-step elicitation needs signed state: pass requestStateKey to createServer, " +
+            "or ask for everything in one round with elicitAll."
+        );
+      }
+      return {
+        ...result,
+        requestState: await context.mintRequestState({ answers: merged }),
+      };
     },
-    required: ["choice"],
   };
-
-  const result = await elicitInput<{ choice: T }>(server, message, schema, options);
-
-  if (result.action === "accept" && result.content) {
-    return result.content.choice;
-  }
-
-  return undefined;
 }
 
 /**
- * Error thrown when client doesn't support elicitation
+ * Whether this connection can carry an elicitation at all.
+ *
+ * False for legacy HTTP, where per-request serving has no channel to reach the
+ * client. Handlers that can proceed without the input should check this and
+ * take the fallback path rather than returning a request that cannot be met.
+ */
+export function canElicit(context: Pick<ServerContext, "clientCapabilities">): boolean {
+  return context.clientCapabilities?.elicitation !== undefined;
+}
+
+/**
+ * Raised when elicitation is unavailable and the handler cannot continue.
  */
 export class ElicitationNotSupportedError extends Error {
-  constructor(message: string) {
+  constructor(message = "Elicitation is not available on this connection") {
     super(message);
     this.name = "ElicitationNotSupportedError";
   }
 }
 
 /**
- * Error thrown when user declines or cancels elicitation
+ * Raised when the user declined or cancelled and the handler cannot continue.
  */
 export class ElicitationDeclinedError extends Error {
-  constructor(message: string) {
+  constructor(message = "User declined to provide input") {
     super(message);
     this.name = "ElicitationDeclinedError";
-  }
-}
-
-/**
- * Error thrown when elicitation validation fails
- */
-export class ElicitationValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ElicitationValidationError";
   }
 }

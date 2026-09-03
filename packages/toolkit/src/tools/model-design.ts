@@ -5,7 +5,7 @@
  * Supports actions: start, add-entity, update-entity, remove-entity, show, finalize.
  */
 
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 
 import {
   createToolkitStorage,

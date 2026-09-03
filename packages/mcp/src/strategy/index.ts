@@ -3,11 +3,37 @@
  *
  * Implements the tri-state delegation hierarchy:
  * 1. "I can do it" - Local implementation (DEFAULT - self-reliant)
- * 2. "Someone else is better" - Delegate to host LLM via sampling (opt-in)
+ * 2. "Someone else is better" - Delegate to the host LLM (opt-in)
  * 3. "Emergency" - Neither works, escalate/error
  *
  * Philosophy: Tools are self-reliant by default. Delegation is an explicit
  * choice when the tool knows the host LLM can do it better.
+ *
+ * ## Delegation is a round trip, not a call
+ *
+ * `2026-07-28` removed server-to-client requests, so a handler can no longer
+ * `await server.createMessage(...)` mid-call - that throws on a modern
+ * connection. Delegation is expressed as a *pull*: the handler returns a
+ * request for the host LLM to answer, and is called again with the answer.
+ *
+ * ```typescript
+ * const result = await executeWithDelegation(context, args, spec, localFn, options);
+ * if (result.outcome === "pending") {
+ *   return result.request as CallToolResult; // client answers, then calls us again
+ * }
+ * ```
+ *
+ * Because the handler re-runs from the top, put the delegation point *before*
+ * any writes - anything done before it happens on every round.
+ *
+ * | Transport | Era    | Delegation |
+ * |-----------|--------|------------|
+ * | stdio     | modern | yes (pull) |
+ * | stdio     | legacy | yes - the SDK shim turns the return into a 2025 push |
+ * | HTTP      | modern | yes (pull) |
+ * | HTTP      | legacy | local fallback - no channel to reach the client on |
+ *
+ * @see https://modelcontextprotocol.io/specification/2026-07-28
  */
 
 import type {
@@ -17,9 +43,16 @@ import type {
   ToolDelegationConfig,
   ToolDelegationEntry,
 } from "@mcp-toolkit/model";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  type CreateMessageRequestParams,
+  type CreateMessageResult,
+  type InputRequiredResult,
+  type InputResponseView,
+  inputRequired,
+  inputResponse,
+} from "@modelcontextprotocol/server";
 import { logDebug, logWarning } from "../logging.js";
+import type { ServerContext } from "../server.js";
 
 // =============================================================================
 // Constants
@@ -97,32 +130,19 @@ export const resolveToolStrategy = resolveToolDelegation;
  * This examines the client capabilities negotiated during MCP handshake.
  * Returns false if server is undefined (e.g., in tests without a real server).
  */
-export function clientSupportsSampling(server: Server | undefined): boolean {
-  if (!server) {
-    return false;
-  }
-  const capabilities = (
-    server as unknown as {
-      _clientCapabilities?: { sampling?: object };
-    }
-  )._clientCapabilities;
-  return Boolean(capabilities?.sampling);
+export function clientSupportsSampling(
+  context: Pick<ServerContext, "clientCapabilities"> | undefined
+): boolean {
+  return Boolean(context?.clientCapabilities?.sampling);
 }
 
 /**
  * Get client capabilities for inspection
  */
 export function getClientCapabilities(
-  server: Server | undefined
+  context: Pick<ServerContext, "clientCapabilities"> | undefined
 ): Record<string, unknown> | undefined {
-  if (!server) {
-    return undefined;
-  }
-  return (
-    server as unknown as {
-      _clientCapabilities?: Record<string, unknown>;
-    }
-  )._clientCapabilities;
+  return context?.clientCapabilities as Record<string, unknown> | undefined;
 }
 
 // =============================================================================
@@ -130,18 +150,26 @@ export function getClientCapabilities(
 // =============================================================================
 
 /**
- * Delegation function type - attempts to delegate work to LLM via sampling
+ * Describes work to hand to the host LLM.
  *
- * @param server - MCP Server instance for sampling access
- * @param args - Arguments for the delegation
- * @param timeout - Optional timeout in milliseconds
- * @returns Promise resolving to the delegation result
+ * Split in two because delegation is a round trip: `build` produces the
+ * question, and `parse` reads the answer when the handler is called again.
+ * `parse` returns undefined if the answer is unusable, which is treated as a
+ * failed delegation (and so falls back to local, when allowed).
  */
-export type DelegationFn<TArgs, TResult> = (
-  server: Server, // Server is always defined when delegation is attempted
-  args: TArgs,
-  timeout?: number
-) => Promise<TResult>;
+export type SamplingAnswer = Extract<InputResponseView, { kind: "sampling" }>["result"];
+
+export interface DelegationSpec<TArgs, TResult> {
+  /** Build the sampling request to send to the host LLM */
+  build: (args: TArgs) => CreateMessageRequestParams;
+  /** Interpret the LLM's answer; undefined means it could not be used */
+  parse: (result: SamplingAnswer, args: TArgs) => TResult | undefined;
+  /**
+   * Names this request among any others in flight. Defaults to the tool name,
+   * which is unique enough for a single delegating tool.
+   */
+  key?: string;
+}
 
 /**
  * Local execution function type - executes locally without delegation
@@ -203,155 +231,142 @@ export class ExecutionStrategyError extends Error {
 // =============================================================================
 
 /**
- * Execute a tool with optional delegation to the host LLM
+ * Execute a tool step, optionally delegating it to the host LLM.
  *
- * This function implements the tri-state execution hierarchy:
- * - local-only (DEFAULT): Execute locally, never attempt delegation
- * - delegate-first: Try delegation, fallback to local if it fails
- * - delegate-only: Must delegate, error if sampling unavailable
+ * Implements the tri-state hierarchy:
+ * - `local-only` (DEFAULT): execute locally, never delegate
+ * - `delegate-first`: ask the LLM; fall back to local if it cannot answer
+ * - `delegate-only`: must delegate; error if the LLM is unreachable
  *
- * @param server - MCP Server instance (for sampling access), can be undefined in tests
- * @param args - Arguments for the tool
- * @param delegateFn - Function to delegate to LLM ("someone else is better")
- * @param localFn - Function to execute locally ("I can do it")
+ * Delegation is a round trip. On the first call this returns
+ * `outcome: "pending"` with a `request` the handler must return; the client
+ * answers it and calls the tool again, and this returns `outcome: "delegated"`
+ * with the parsed answer.
+ *
+ * @param context - Handler context (carries client capabilities and any answer)
+ * @param args - Arguments for the step
+ * @param spec - How to ask the LLM, and how to read its answer
+ * @param localFn - Local implementation ("I can do it")
  * @param options - Delegation options
- * @returns Delegation result with outcome and result
  *
  * @example
  * ```typescript
- * const result = await executeWithDelegation(
- *   server,
- *   { query: "What model are you?" },
- *   async (server, args) => {
- *     // Delegate to LLM - they know better
- *     const response = await server.createMessage({
- *       messages: [{ role: "user", content: { type: "text", text: args.query } }],
+ * const outcome = await executeWithDelegation(
+ *   context,
+ *   { timeout: 30_000 },
+ *   {
+ *     build: () => ({
+ *       messages: [{ role: "user", content: { type: "text", text: "What model are you?" } }],
  *       maxTokens: 100,
- *     });
- *     return extractTextFromSamplingResponse(response);
+ *     }),
+ *     parse: (result) => extractTextFromSamplingResponse(result),
  *   },
- *   async (args) => {
- *     // Local fallback - we don't know
- *     return "unknown";
- *   },
+ *   async () => "unknown",
  *   { mode: "delegate-first", toolName: "client_discovery" }
  * );
+ *
+ * if (outcome.outcome === "pending") {
+ *   return outcome.request as CallToolResult;
+ * }
  * ```
  */
 export async function executeWithDelegation<TArgs, TResult>(
-  server: Server | undefined,
+  context: Pick<ServerContext, "clientCapabilities" | "inputResponses"> | undefined,
   args: TArgs,
-  delegateFn: DelegationFn<TArgs, TResult>,
+  spec: DelegationSpec<TArgs, TResult>,
   localFn: LocalExecutionFn<TArgs, TResult>,
   options: DelegationOptions
 ): Promise<DelegationResult> {
-  const {
-    mode,
-    delegationTimeout = DEFAULT_DELEGATION_TIMEOUT_MS,
-    fallbackEnabled = true,
-    toolName = "unknown",
-  } = options;
+  const { mode, fallbackEnabled = true, toolName = "unknown" } = options;
 
   const startTime = Date.now();
   let delegationAttempted = false;
   let delegationError: string | undefined;
 
-  // Helper to build result
-  const buildResult = (outcome: ExecutionOutcome, result: unknown): DelegationResult => ({
+  const buildResult = (
+    outcome: ExecutionOutcome,
+    result: unknown,
+    request?: InputRequiredResult
+  ): DelegationResult => ({
     outcome,
     result,
+    ...(request === undefined ? {} : { request }),
     delegationAttempted,
     delegationError,
     executionTimeMs: Date.now() - startTime,
   });
 
-  // Check sampling availability
-  const samplingAvailable = clientSupportsSampling(server);
-
-  logDebug(`Delegation execution: ${toolName}`, {
-    metadata: {
-      mode,
-      samplingAvailable,
-      delegationTimeout,
-    },
-  });
+  const runLocal = async (outcome: ExecutionOutcome): Promise<DelegationResult> => {
+    try {
+      return buildResult(outcome, await localFn(args));
+    } catch (error) {
+      throw new ExecutionStrategyError(
+        `Local execution failed for ${toolName}: ${String(error)}`,
+        delegationError,
+        String(error)
+      );
+    }
+  };
 
   // ==========================================================================
   // Mode: local-only (DEFAULT)
   // "I can do it" - never delegate
   // ==========================================================================
   if (mode === "local-only") {
-    try {
-      const result = await localFn(args);
-      return buildResult("local", result);
-    } catch (error) {
-      throw new ExecutionStrategyError(
-        `Local execution failed for ${toolName}: ${String(error)}`,
-        undefined,
-        String(error)
-      );
-    }
+    return runLocal("local");
   }
 
-  // ==========================================================================
-  // Mode: delegate-only
-  // "Someone else MUST do it" - error if unavailable
-  // ==========================================================================
-  if (mode === "delegate-only") {
-    if (!samplingAvailable || !server) {
+  const key = spec.key ?? toolName;
+
+  // Has the host LLM already answered? If so this is the resumed round.
+  const view = inputResponse(context?.inputResponses, key);
+  if (view?.kind === "sampling") {
+    delegationAttempted = true;
+    const parsed = spec.parse(view.result, args);
+    if (parsed !== undefined) {
+      return buildResult("delegated", parsed);
+    }
+
+    delegationError = "The host LLM's answer could not be used";
+    logWarning(`Delegation answer unusable for ${toolName}`, {
+      metadata: { key },
+    });
+
+    if (mode === "delegate-only" || !fallbackEnabled) {
+      throw new ExecutionStrategyError(
+        `Delegation failed for ${toolName} and no fallback allowed`,
+        delegationError
+      );
+    }
+    return runLocal("fallback-local");
+  }
+
+  // Not answered yet. Can this connection reach the host LLM at all?
+  const samplingAvailable = clientSupportsSampling(context);
+
+  logDebug(`Delegation execution: ${toolName}`, {
+    metadata: { mode, samplingAvailable, key },
+  });
+
+  if (!samplingAvailable) {
+    if (mode === "delegate-only") {
       throw new DelegationUnavailableError(
-        `Tool ${toolName} requires delegation but client does not support sampling`
+        `Tool ${toolName} requires delegation but the client does not support sampling`
       );
     }
-
-    delegationAttempted = true;
-    try {
-      const result = await delegateFn(server, args, delegationTimeout);
-      return buildResult("delegated", result);
-    } catch (error) {
-      throw new ExecutionStrategyError(
-        `Delegation failed for ${toolName} and no fallback allowed: ${String(error)}`,
-        String(error)
-      );
-    }
+    // No channel to the LLM (legacy HTTP, or a client without the capability).
+    return runLocal("local");
   }
 
-  // ==========================================================================
-  // Mode: delegate-first
-  // "Someone else is better" - try delegation, fallback to local
-  // ==========================================================================
-  if (samplingAvailable && server) {
-    delegationAttempted = true;
-    try {
-      const result = await delegateFn(server, args, delegationTimeout);
-      return buildResult("delegated", result);
-    } catch (error) {
-      delegationError = String(error);
-      logWarning(`Delegation failed for ${toolName}, attempting local fallback`, {
-        metadata: { error: delegationError },
-      });
-
-      if (!fallbackEnabled) {
-        throw new ExecutionStrategyError(
-          `Delegation failed for ${toolName} and fallback disabled`,
-          delegationError
-        );
-      }
-    }
-  }
-
-  // Fallback to local execution
-  try {
-    const result = await localFn(args);
-    const outcome: ExecutionOutcome = delegationAttempted ? "fallback-local" : "local";
-    return buildResult(outcome, result);
-  } catch (error) {
-    throw new ExecutionStrategyError(
-      `Both delegation and local execution failed for ${toolName}`,
-      delegationError,
-      String(error)
-    );
-  }
+  // Ask. The handler returns this, and we are called again with the answer.
+  delegationAttempted = true;
+  return buildResult(
+    "pending",
+    undefined,
+    inputRequired({
+      inputRequests: { [key]: inputRequired.createMessage(spec.build(args)) },
+    })
+  );
 }
 
 // =============================================================================

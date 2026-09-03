@@ -68,6 +68,7 @@ export {
   logToolRequest,
   logWarning,
   McpProtocolTransport,
+  OTEL_SEVERITY_NUMBER,
   removeMcpTransport,
   StderrTransport,
 } from "./logging.js";
@@ -107,8 +108,6 @@ export {
   createSessionStateTracker,
   type SessionState,
   SessionStateTracker,
-  type SessionTimingInfo,
-  type StateTransitionResult,
   type ToolAllowanceConfig,
   WorkflowViolationError,
 } from "./session-state.js";

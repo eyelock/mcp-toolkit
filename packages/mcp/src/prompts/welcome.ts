@@ -5,7 +5,7 @@
  * Integrates with the hooks system for core session guidance.
  */
 
-import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult, Prompt } from "@modelcontextprotocol/server";
 import { getSessionStartContent } from "../hooks/index.js";
 import type { ServerContext } from "../server.js";
 
@@ -32,7 +32,9 @@ export async function getWelcomePrompt(
   context: ServerContext
 ): Promise<GetPromptResult> {
   const includeExamples = args?.include_examples === "true";
-  const session = await context.provider.getSession();
+  const session = context.sessionId
+    ? await context.provider.getSession(context.sessionId)
+    : { success: true, data: null };
 
   // Get core session guidance from hooks
   const coreGuidance = await getSessionStartContent();
@@ -139,11 +141,15 @@ export async function getSessionSetupPrompt(
   _args: Record<string, string> | undefined,
   context: ServerContext
 ): Promise<GetPromptResult> {
-  const hasSession = await context.provider.hasSession();
+  const hasSession = context.sessionId
+    ? await context.provider.hasSession(context.sessionId)
+    : false;
   const coreGuidance = await getSessionStartContent();
 
   if (hasSession) {
-    const session = await context.provider.getSession();
+    const session = context.sessionId
+      ? await context.provider.getSession(context.sessionId)
+      : { success: true, data: null };
     return {
       messages: [
         {

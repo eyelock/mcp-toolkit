@@ -8,7 +8,7 @@ describe("Resources Registry", () => {
   let context: ServerContext;
 
   beforeEach(() => {
-    context = { provider: createMemoryProvider() };
+    context = { provider: createMemoryProvider(), sessionId: "test-session" };
   });
 
   describe("registerResources", () => {
@@ -54,7 +54,7 @@ describe("Resources Registry", () => {
 
   describe("handleResourceRead", () => {
     it("handles known static resource URI", async () => {
-      await context.provider.initSession({ projectName: "test-project" });
+      await context.provider.initSession({ projectName: "test-project" }, context.sessionId);
 
       const result = await handleResourceRead(SESSION_RESOURCE_URI, context);
 
@@ -74,10 +74,13 @@ describe("Resources Registry", () => {
     });
 
     it("handles templated config resource URI", async () => {
-      await context.provider.initSession({
-        projectName: "test-project",
-        features: { tools: true },
-      });
+      await context.provider.initSession(
+        {
+          projectName: "test-project",
+          features: { tools: true },
+        },
+        context.sessionId
+      );
 
       const result = await handleResourceRead("config:///tools", context);
 

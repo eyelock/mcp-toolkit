@@ -155,6 +155,7 @@ describe("Resource Templates", () => {
   describe("readFeatureConfig", () => {
     it("returns config for valid feature with active session", async () => {
       const mockContext = {
+        sessionId: "test-session",
         provider: {
           getSession: vi.fn().mockResolvedValue({
             data: {
@@ -182,6 +183,7 @@ describe("Resource Templates", () => {
 
     it("returns error for unknown feature", async () => {
       const mockContext = {
+        sessionId: "test-session",
         provider: {
           getSession: vi.fn().mockResolvedValue({ data: null }),
         },
@@ -197,6 +199,7 @@ describe("Resource Templates", () => {
 
     it("returns error when no active session", async () => {
       const mockContext = {
+        sessionId: "test-session",
         provider: {
           getSession: vi.fn().mockResolvedValue({ data: null }),
         },
@@ -210,6 +213,7 @@ describe("Resource Templates", () => {
 
     it("returns correct descriptions for each feature", async () => {
       const mockContext = {
+        sessionId: "test-session",
         provider: {
           getSession: vi.fn().mockResolvedValue({
             data: { projectName: "test", features: { sampling: true } },
@@ -298,6 +302,7 @@ describe("Resource Templates", () => {
 
     it("routes config URIs to readFeatureConfig", async () => {
       const mockContext = {
+        sessionId: "test-session",
         provider: {
           getSession: vi.fn().mockResolvedValue({
             data: { projectName: "test", features: { tools: true } },

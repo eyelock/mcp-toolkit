@@ -7,7 +7,7 @@ describe("Prompts Registry", () => {
   let context: ServerContext;
 
   beforeEach(() => {
-    context = { provider: createMemoryProvider() };
+    context = { provider: createMemoryProvider(), sessionId: "test-session" };
   });
 
   describe("registerPrompts", () => {

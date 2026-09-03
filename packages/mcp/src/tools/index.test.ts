@@ -15,6 +15,7 @@ describe("Tools Registry", () => {
   beforeEach(() => {
     context = {
       provider: createMemoryProvider(),
+      sessionId: "test-session",
       identity: defaultIdentity,
       name: "test-toolkit",
       version: "0.0.0",
@@ -77,7 +78,7 @@ describe("Tools Registry", () => {
     });
 
     it("handles session_update tool", async () => {
-      await context.provider.initSession({ projectName: "old-name" });
+      await context.provider.initSession({ projectName: "old-name" }, context.sessionId);
 
       const result = await handleToolCall("session_update", { projectName: "new-name" }, context);
 
@@ -85,12 +86,12 @@ describe("Tools Registry", () => {
     });
 
     it("handles session_clear tool", async () => {
-      await context.provider.initSession({ projectName: "test" });
+      await context.provider.initSession({ projectName: "test" }, context.sessionId);
 
       const result = await handleToolCall("session_clear", {}, context);
 
       expect(result.isError).toBeUndefined();
-      expect(await context.provider.hasSession()).toBe(false);
+      expect(await context.provider.hasSession(context.sessionId)).toBe(false);
     });
 
     it("handles server_info tool", async () => {

@@ -17,6 +17,7 @@ describe("Server Info Tool", () => {
     it("returns server identity with no tags", async () => {
       const context: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: {
           canonicalName: "my-toolkit",
           tags: {},
@@ -39,6 +40,7 @@ describe("Server Info Tool", () => {
     it("returns server identity with single tag", async () => {
       const context: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: {
           canonicalName: "my-toolkit",
           tags: { env: "development" },
@@ -58,6 +60,7 @@ describe("Server Info Tool", () => {
     it("returns server identity with multiple tags", async () => {
       const context: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: {
           canonicalName: "my-toolkit",
           tags: { env: "staging", team: "platform", region: "us-west-2" },
@@ -79,6 +82,7 @@ describe("Server Info Tool", () => {
     it("ignores args parameter", async () => {
       const context: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: {
           canonicalName: "test",
           tags: {},

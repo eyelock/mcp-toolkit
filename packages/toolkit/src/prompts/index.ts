@@ -4,7 +4,7 @@
  * Central registry for all toolkit MCP prompts.
  */
 
-import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult, Prompt } from "@modelcontextprotocol/server";
 import {
   designEntityPrompt,
   designStartPrompt,

@@ -1,213 +1,140 @@
-/**
- * Session State Management Tests
- */
-
+import { createMemoryProvider, type SessionProvider } from "@mcp-toolkit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createBlockingResponse,
   createSessionStateTracker,
   type SessionStateTracker,
-  SessionStateTracker as SessionStateTrackerClass,
   WorkflowViolationError,
 } from "./session-state.js";
 
 describe("SessionStateTracker", () => {
   let tracker: SessionStateTracker;
+  let provider: SessionProvider;
 
   beforeEach(() => {
-    tracker = createSessionStateTracker("session_init", ["my_tool", "other_tool"]);
+    tracker = createSessionStateTracker("session_init", ["restricted_tool"]);
+    provider = createMemoryProvider();
   });
 
-  describe("initial state", () => {
-    it("starts in uninitialized state", () => {
-      expect(tracker.getState()).toBe("uninitialized");
+  describe("policy", () => {
+    it("recognises init tools", () => {
+      expect(tracker.isInitTool("session_init")).toBe(true);
+      expect(tracker.isInitTool("server_info")).toBe(true);
+      expect(tracker.isInitTool("restricted_tool")).toBe(false);
     });
 
-    it("is not initialized initially", () => {
-      expect(tracker.isInitialized()).toBe(false);
-    });
-
-    it("has no session ID initially", () => {
-      expect(tracker.getSessionId()).toBeNull();
+    it("recognises tools that require init", () => {
+      expect(tracker.requiresInit("restricted_tool")).toBe(true);
+      expect(tracker.requiresInit("some_other_tool")).toBe(false);
     });
   });
 
-  describe("setSessionId / getSessionId", () => {
-    it("sets and gets session ID", () => {
-      tracker.setSessionId("test-session-123");
-      expect(tracker.getSessionId()).toBe("test-session-123");
+  describe("getState", () => {
+    it("is uninitialized without a handle", async () => {
+      expect(await tracker.getState(null, provider)).toBe("uninitialized");
+    });
+
+    it("is uninitialized for an unknown handle", async () => {
+      expect(await tracker.getState("nope", provider)).toBe("uninitialized");
+    });
+
+    it("is initialized once the handle resolves", async () => {
+      const created = await provider.initSession({ projectName: "test-project" });
+
+      expect(await tracker.getState(created.data?.sessionId ?? "", provider)).toBe("initialized");
+    });
+
+    // State is derived, never remembered - so it follows storage, including
+    // storage written by some other instance or a previous process.
+    it("follows storage rather than call history", async () => {
+      const created = await provider.initSession({ projectName: "test-project" });
+      const sessionId = created.data?.sessionId ?? "";
+      expect(await tracker.getState(sessionId, provider)).toBe("initialized");
+
+      await provider.clearSession(sessionId);
+      expect(await tracker.getState(sessionId, provider)).toBe("uninitialized");
     });
   });
 
   describe("checkToolAllowed", () => {
-    it("allows init tools before initialization", () => {
-      expect(tracker.checkToolAllowed("session_init")).toBeNull();
-      expect(tracker.checkToolAllowed("server_info")).toBeNull();
+    it("always allows init tools, even with no handle", async () => {
+      expect(await tracker.checkToolAllowed("session_init", null, provider)).toBeNull();
+      expect(await tracker.checkToolAllowed("server_info", null, provider)).toBeNull();
     });
 
-    it("blocks tools that require init before initialization", () => {
-      const result = tracker.checkToolAllowed("my_tool");
-      expect(result).toContain("requires session initialization");
-      expect(result).toContain("session_init");
+    it("allows unrestricted tools with no handle", async () => {
+      expect(await tracker.checkToolAllowed("some_other_tool", null, provider)).toBeNull();
     });
 
-    it("allows all tools after initialization", () => {
-      tracker.recordToolCall("session_init");
-      expect(tracker.checkToolAllowed("my_tool")).toBeNull();
-      expect(tracker.checkToolAllowed("other_tool")).toBeNull();
+    it("blocks a restricted tool when no handle is supplied", async () => {
+      const message = await tracker.checkToolAllowed("restricted_tool", null, provider);
+
+      expect(message).toContain("restricted_tool");
+      expect(message).toContain("no session_id was supplied");
+      expect(message).toContain("session_init");
     });
 
-    it("tracks requestId when provided", () => {
-      tracker.checkToolAllowed("session_init", "req-123");
-      const timing = tracker.getTimingInfo();
-      expect(timing.requestId).toBe("req-123");
-    });
-  });
+    it("blocks a restricted tool when the handle is unknown", async () => {
+      const message = await tracker.checkToolAllowed("restricted_tool", "bogus-handle", provider);
 
-  describe("recordToolCall", () => {
-    it("transitions to initialized on init tool call", () => {
-      const result = tracker.recordToolCall("session_init");
-      expect(result.previousState).toBe("uninitialized");
-      expect(result.newState).toBe("initialized");
-      expect(result.transitioned).toBe(true);
-      expect(result.guidance).toContain("initialized");
+      expect(message).toContain("bogus-handle");
+      expect(message).toContain("unknown or has expired");
     });
 
-    it("sets initAt timestamp on initialization", () => {
-      const before = Date.now();
-      tracker.recordToolCall("session_init");
-      const timing = tracker.getTimingInfo();
-      expect(timing.initAt).toBeGreaterThanOrEqual(before);
-      expect(timing.initAt).toBeLessThanOrEqual(Date.now());
+    it("allows a restricted tool once the handle resolves", async () => {
+      const created = await provider.initSession({ projectName: "test-project" });
+
+      expect(
+        await tracker.checkToolAllowed("restricted_tool", created.data?.sessionId ?? "", provider)
+      ).toBeNull();
     });
 
-    it("transitions to working on first real work", () => {
-      tracker.recordToolCall("session_init");
-      const result = tracker.recordToolCall("my_tool");
-      expect(result.previousState).toBe("initialized");
-      expect(result.newState).toBe("working");
-      expect(result.transitioned).toBe(true);
+    // The behaviour the in-memory tracker could not provide: a handle minted
+    // by one process is honoured by a tracker that never saw it created.
+    it("honours a handle it never saw created, given shared storage", async () => {
+      const created = await provider.initSession({ projectName: "test-project" });
+      const otherInstance = createSessionStateTracker("session_init", ["restricted_tool"]);
+
+      expect(
+        await otherInstance.checkToolAllowed(
+          "restricted_tool",
+          created.data?.sessionId ?? "",
+          provider
+        )
+      ).toBeNull();
     });
 
-    it("stays in working state on subsequent calls", () => {
-      tracker.recordToolCall("session_init");
-      tracker.recordToolCall("my_tool");
-      const result = tracker.recordToolCall("other_tool");
-      expect(result.previousState).toBe("working");
-      expect(result.newState).toBe("working");
-      expect(result.transitioned).toBe(false);
-    });
+    it("blocks when storage is not shared", async () => {
+      const created = await provider.initSession({ projectName: "test-project" });
+      const unsharedStorage = createMemoryProvider();
 
-    it("tracks requestId when provided", () => {
-      tracker.recordToolCall("session_init", "req-456");
-      const timing = tracker.getTimingInfo();
-      expect(timing.requestId).toBe("req-456");
+      const message = await tracker.checkToolAllowed(
+        "restricted_tool",
+        created.data?.sessionId ?? "",
+        unsharedStorage
+      );
+
+      expect(message).toContain("unknown or has expired");
     });
   });
 
-  describe("reset", () => {
-    it("resets all state", () => {
-      tracker.setSessionId("test-session");
-      tracker.recordToolCall("session_init", "req-123");
-      tracker.recordToolCall("my_tool");
+  describe("createBlockingResponse", () => {
+    it("formats an error result", () => {
+      const response = createBlockingResponse("nope");
 
-      tracker.reset();
-
-      expect(tracker.getState()).toBe("uninitialized");
-      expect(tracker.isInitialized()).toBe(false);
-      expect(tracker.getSessionId()).toBeNull();
-      const timing = tracker.getTimingInfo();
-      expect(timing.initAt).toBeNull();
-      expect(timing.requestId).toBeNull();
+      expect(response.isError).toBe(true);
+      expect(response.content[0]?.text).toBe("nope");
     });
   });
 
-  describe("getTimingInfo", () => {
-    it("returns complete timing info", () => {
-      tracker.setSessionId("session-abc");
-      tracker.recordToolCall("session_init", "req-xyz");
+  describe("WorkflowViolationError", () => {
+    it("carries context about the violation", () => {
+      const error = new WorkflowViolationError("blocked", "my_tool", "uninitialized", "call init");
 
-      const timing = tracker.getTimingInfo();
-      expect(timing.state).toBe("initialized");
-      expect(timing.sessionId).toBe("session-abc");
-      expect(timing.requestId).toBe("req-xyz");
-      expect(timing.initAt).not.toBeNull();
+      expect(error.name).toBe("WorkflowViolationError");
+      expect(error.toolName).toBe("my_tool");
+      expect(error.currentState).toBe("uninitialized");
+      expect(error.requiredAction).toBe("call init");
     });
-  });
-});
-
-describe("createSessionStateTracker", () => {
-  it("creates tracker with default init tool", () => {
-    const tracker = createSessionStateTracker();
-    expect(tracker.checkToolAllowed("session_init")).toBeNull();
-    expect(tracker.checkToolAllowed("server_info")).toBeNull();
-  });
-
-  it("creates tracker with custom init tool", () => {
-    const tracker = createSessionStateTracker("custom_init");
-    expect(tracker.checkToolAllowed("custom_init")).toBeNull();
-    expect(tracker.checkToolAllowed("session_init")).toBeNull(); // server_info also allowed
-  });
-
-  it("creates tracker with requiresInit tools", () => {
-    const tracker = createSessionStateTracker("session_init", ["protected_tool"]);
-    const result = tracker.checkToolAllowed("protected_tool");
-    expect(result).toContain("requires session initialization");
-  });
-});
-
-describe("Custom transition triggers", () => {
-  it("handles custom transitions that are not initialized", () => {
-    // Create tracker with custom transition from initialized to ready
-    const tracker = new SessionStateTrackerClass({
-      initTools: new Set(["session_init"]),
-      requiresInit: new Set(),
-      transitionTriggers: new Map([
-        ["session_init", "initialized"],
-        ["activate_tool", "ready"], // Custom transition from initialized to ready
-      ]),
-    });
-
-    // First, initialize
-    tracker.recordToolCall("session_init");
-    expect(tracker.getState()).toBe("initialized");
-
-    // Then trigger custom transition (initialized -> ready)
-    const result = tracker.recordToolCall("activate_tool");
-    expect(result.transitioned).toBe(true);
-    expect(result.newState).toBe("ready");
-    expect(result.guidance).toBeUndefined(); // Custom transitions don't have built-in guidance
-  });
-});
-
-describe("createBlockingResponse", () => {
-  it("creates properly formatted error response", () => {
-    const response = createBlockingResponse("Test error message");
-    expect(response.isError).toBe(true);
-    expect(response.content).toHaveLength(1);
-    expect(response.content[0].type).toBe("text");
-    expect(response.content[0].text).toBe("Test error message");
-  });
-});
-
-describe("WorkflowViolationError", () => {
-  it("creates error with all properties", () => {
-    const error = new WorkflowViolationError(
-      "Tool blocked",
-      "my_tool",
-      "uninitialized",
-      "Call session_init first"
-    );
-
-    expect(error.message).toBe("Tool blocked");
-    expect(error.name).toBe("WorkflowViolationError");
-    expect(error.toolName).toBe("my_tool");
-    expect(error.currentState).toBe("uninitialized");
-    expect(error.requiredAction).toBe("Call session_init first");
-  });
-
-  it("is instanceof Error", () => {
-    const error = new WorkflowViolationError("msg", "tool", "uninitialized", "action");
-    expect(error).toBeInstanceOf(Error);
   });
 });

@@ -7,9 +7,9 @@
 
 import type { ClientMetadata } from "@mcp-toolkit/model";
 import { ClientMetadataSchema } from "@mcp-toolkit/model";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { logDebug, logInfo, logWarning } from "../logging.js";
-import { clientSupportsSampling, extractTextFromSamplingResponse } from "./index.js";
+import type { CreateMessageResult } from "@modelcontextprotocol/server";
+import { logInfo, logWarning } from "../logging.js";
+import { type DelegationSpec, extractTextFromSamplingResponse } from "./index.js";
 
 // =============================================================================
 // Constants
@@ -46,91 +46,74 @@ export const CLIENT_DISCOVERY_TIMEOUT_MS = 30_000;
 // =============================================================================
 
 /**
- * Attempt to discover client metadata via sampling
+ * The delegation spec for client discovery.
  *
- * This function uses sampling to ask the host LLM about itself.
- * It's a demonstration of the "someone else is better" pattern -
- * only the LLM knows its own model identifier.
+ * Split into `build` (ask) and `parse` (read the answer) because delegation is
+ * a round trip under `2026-07-28` - the handler cannot await a reply mid-call.
  *
- * @param server - MCP Server instance with sampling access
- * @param timeout - Timeout for the sampling request in milliseconds
- * @returns Discovered client metadata or null if discovery failed/unavailable
+ * This remains the archetypal delegation case: only the LLM knows what model it
+ * is, so there is no local implementation that could ever be as good.
  *
  * @example
  * ```typescript
- * const metadata = await discoverClientMetadata(server);
- * if (metadata) {
- *   console.log(`Connected to ${metadata.model} via ${metadata.clientName}`);
- * }
+ * const outcome = await executeWithDelegation(
+ *   context,
+ *   undefined,
+ *   clientDiscoverySpec,
+ *   async () => null,
+ *   { mode: "delegate-first", toolName: "session_init:client_discovery" }
+ * );
+ * if (outcome.outcome === "pending") return outcome.request as CallToolResult;
  * ```
  */
-export async function discoverClientMetadata(
-  server: Server,
-  timeout: number = CLIENT_DISCOVERY_TIMEOUT_MS
-): Promise<ClientMetadata | null> {
-  // Check if sampling is available
-  if (!clientSupportsSampling(server)) {
-    logDebug("Client discovery skipped: sampling not available");
-    return null;
-  }
+export const clientDiscoverySpec: DelegationSpec<unknown, ClientMetadata> = {
+  key: "client_discovery",
 
-  try {
-    logDebug("Attempting client discovery via sampling");
-
-    // Use sampling to ask the LLM about itself
-    const response = await server.createMessage(
+  build: () => ({
+    messages: [
       {
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: CLIENT_DISCOVERY_PROMPT,
-            },
-          },
-        ],
-        maxTokens: 500,
+        role: "user" as const,
+        content: { type: "text" as const, text: CLIENT_DISCOVERY_PROMPT },
       },
-      { timeout }
-    );
+    ],
+    maxTokens: 500,
+  }),
 
-    const text = extractTextFromSamplingResponse(response);
+  parse: (result) => {
+    try {
+      const text = extractTextFromSamplingResponse(result as CreateMessageResult);
 
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = text.trim();
+      // Handle ```json ... ``` or ``` ... ``` code blocks
+      let jsonStr = text.trim();
+      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch?.[1]) {
+        jsonStr = jsonMatch[1].trim();
+      }
 
-    // Handle ```json ... ``` or ``` ... ``` code blocks
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch?.[1]) {
-      jsonStr = jsonMatch[1].trim();
-    }
+      const validated = ClientMetadataSchema.safeParse(JSON.parse(jsonStr));
+      if (validated.success) {
+        logInfo("Client discovery successful", {
+          metadata: {
+            clientName: validated.data.clientName,
+            model: validated.data.model,
+            modelProvider: validated.data.modelProvider,
+          },
+        });
+        return validated.data;
+      }
 
-    // Parse and validate
-    const parsed = JSON.parse(jsonStr);
-    const validated = ClientMetadataSchema.safeParse(parsed);
-
-    if (validated.success) {
-      logInfo("Client discovery successful", {
-        metadata: {
-          clientName: validated.data.clientName,
-          model: validated.data.model,
-          modelProvider: validated.data.modelProvider,
-        },
+      logWarning("Client discovery response failed validation", {
+        metadata: { error: validated.error.message },
       });
-      return validated.data;
+      return undefined;
+    } catch (error) {
+      logWarning("Client discovery response could not be parsed", {
+        metadata: { error: String(error) },
+      });
+      return undefined;
     }
-
-    logWarning("Client discovery response failed validation", {
-      metadata: { error: validated.error.message },
-    });
-    return null;
-  } catch (error) {
-    logWarning("Client discovery failed", {
-      metadata: { error: String(error) },
-    });
-    return null;
-  }
-}
+  },
+};
 
 /**
  * Create a sampling request for client discovery

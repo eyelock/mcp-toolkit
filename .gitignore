@@ -22,6 +22,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Session storage written by FileProvider / the CLI
+.mcp-toolkit/
+
 # Environment
 .env
 .env.local
@@ -35,3 +38,4 @@ logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.worktrees/

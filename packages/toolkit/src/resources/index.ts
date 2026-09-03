@@ -7,8 +7,8 @@
 import type {
   ReadResourceResult,
   Resource,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/types.js";
+  ResourceTemplateType,
+} from "@modelcontextprotocol/server";
 import { clientsResourceTemplate, getClientNames, readClientConfigResource } from "./clients.js";
 import { MODEL_RESOURCE_URI, modelResource, readModelResource } from "./model.js";
 import { getTemplateTypes, readTemplateResource, templatesResourceTemplate } from "./templates.js";
@@ -26,7 +26,7 @@ export const toolkitResources: Resource[] = [modelResource];
 /**
  * All toolkit resource templates
  */
-export const toolkitResourceTemplates: ResourceTemplate[] = [
+export const toolkitResourceTemplates: ResourceTemplateType[] = [
   templatesResourceTemplate,
   clientsResourceTemplate,
 ];
@@ -41,7 +41,7 @@ export function registerToolkitResources(): Resource[] {
 /**
  * Get all toolkit resource templates for registration
  */
-export function registerToolkitResourceTemplates(): ResourceTemplate[] {
+export function registerToolkitResourceTemplates(): ResourceTemplateType[] {
   return toolkitResourceTemplates;
 }
 

@@ -4,7 +4,7 @@
  * Central registry for all toolkit MCP tools.
  */
 
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 import { generateTool, handleGenerate } from "./generate.js";
 import { handleModelDesign, modelDesignTool } from "./model-design.js";
 import { handleModelImport, modelImportTool } from "./model-import.js";

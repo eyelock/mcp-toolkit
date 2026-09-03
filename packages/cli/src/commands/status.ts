@@ -5,8 +5,8 @@
  * Demonstrates CLI/MCP parity pattern.
  */
 
-import { createMemoryProvider } from "@mcp-toolkit/core";
 import { Command, Flags } from "@oclif/core";
+import { CLI_SESSION_ID, createCliProvider } from "../provider.js";
 
 export default class Status extends Command {
   static override description = "Show current session status and configuration";
@@ -23,9 +23,8 @@ export default class Status extends Command {
   public async run(): Promise<void> {
     const { flags } = await this.parse(Status);
 
-    // Use provider (in real implementation, this would read persisted state)
-    const provider = createMemoryProvider();
-    const result = await provider.getSession();
+    const provider = createCliProvider();
+    const result = await provider.getSession(CLI_SESSION_ID);
 
     if (!result.data) {
       if (flags.json) {

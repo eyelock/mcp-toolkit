@@ -7,7 +7,7 @@
  * @see https://modelcontextprotocol.io/specification/2025-03-26/basic/utilities/progress
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { CancellationError } from "./cancellation.js";
 
 /**

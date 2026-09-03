@@ -3,20 +3,28 @@
  *
  * Provides a unified interface for different MCP transport modes:
  * - stdio: Local development, MCP inspector
- * - HTTP/SSE: Remote deployment, web clients
+ * - Streamable HTTP: Remote deployment, web clients (protocol 2026-07-28)
  */
 
-export { createHttpTransport, type HttpTransportConfig } from "./http.js";
+export {
+  createHttpTransport,
+  type HttpTransportConfig,
+  type ServerFactory,
+  validateRequestHeaders,
+} from "./http.js";
 export { createStdioTransport, type StdioTransportOptions } from "./stdio.js";
 
 export type TransportMode = "stdio" | "http";
 
 export interface TransportOptions {
   mode: TransportMode;
+  /** Refuse 2025-era clients (applies to both transports) */
+  rejectLegacy?: boolean;
   httpConfig?: {
     port?: number;
     host?: string;
     authToken?: string;
+    allowedOrigins?: string[];
   };
 }
 
@@ -25,6 +33,7 @@ export interface TransportOptions {
  */
 export function parseTransportArgs(args: string[]): TransportOptions {
   const hasHttp = args.includes("--http");
+  const rejectLegacy = args.includes("--modern-only");
 
   if (hasHttp) {
     const portIndex = args.indexOf("--port");
@@ -36,12 +45,17 @@ export function parseTransportArgs(args: string[]): TransportOptions {
     const tokenIndex = args.indexOf("--token");
     const authToken = tokenIndex !== -1 ? args[tokenIndex + 1] : undefined;
 
+    const originIndex = args.indexOf("--allow-origin");
+    const originArg = originIndex !== -1 ? args[originIndex + 1] : undefined;
+    const allowedOrigins = originArg?.split(",").map((o) => o.trim());
+
     return {
       mode: "http",
-      httpConfig: { port, host, authToken },
+      rejectLegacy,
+      httpConfig: { port, host, authToken, allowedOrigins },
     };
   }
 
   // Default to stdio
-  return { mode: "stdio" };
+  return { mode: "stdio", rejectLegacy };
 }

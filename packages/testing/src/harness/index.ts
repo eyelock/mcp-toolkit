@@ -7,7 +7,7 @@
 
 import type { SessionProvider } from "@mcp-toolkit/core";
 import { createMemoryProvider } from "@mcp-toolkit/core";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { ExpectedToolResult, TestCase } from "../schema.js";
 
 // =============================================================================
@@ -44,6 +44,8 @@ export type PromptHandler = (
  */
 export interface HarnessContext {
   provider: SessionProvider;
+  /** Handle every harness session is stored under */
+  sessionId: string;
   [key: string]: unknown;
 }
 
@@ -53,6 +55,8 @@ export interface HarnessContext {
 export interface TestHarnessConfig {
   /** Session provider (defaults to MemoryProvider) */
   provider?: SessionProvider;
+  /** Handle to store the session under (defaults to `test-session`) */
+  sessionId?: string;
   /** Tool handlers to register */
   tools?: Record<string, ToolHandler>;
   /** Resource handlers to register */
@@ -92,8 +96,12 @@ export interface HarnessToolResult {
  * expect(result.result.content[0].text).toBe("Hello World");
  * ```
  */
+/** Default handle used by the harness when the caller supplies none */
+export const DEFAULT_HARNESS_SESSION_ID = "test-session";
+
 export class TestHarness {
   private readonly provider: SessionProvider;
+  private readonly sessionId: string;
   private readonly tools: Map<string, ToolHandler>;
   private readonly resources: Map<string, ResourceHandler>;
   private readonly prompts: Map<string, PromptHandler>;
@@ -101,6 +109,7 @@ export class TestHarness {
 
   constructor(config: TestHarnessConfig = {}) {
     this.provider = config.provider ?? createMemoryProvider();
+    this.sessionId = config.sessionId ?? DEFAULT_HARNESS_SESSION_ID;
     this.tools = new Map(Object.entries(config.tools ?? {}));
     this.resources = new Map(Object.entries(config.resources ?? {}));
     this.prompts = new Map(Object.entries(config.prompts ?? {}));
@@ -113,6 +122,7 @@ export class TestHarness {
   get context(): HarnessContext {
     return {
       provider: this.provider,
+      sessionId: this.sessionId,
       ...this.contextData,
     };
   }
@@ -234,7 +244,7 @@ export class TestHarness {
    * Reset the harness state (clears provider session)
    */
   async reset(): Promise<void> {
-    await this.provider.clearSession();
+    await this.provider.clearSession(this.sessionId);
   }
 }
 

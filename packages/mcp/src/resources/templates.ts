@@ -8,7 +8,7 @@
  * ## Template Pattern
  *
  * Each template follows this pattern:
- * 1. Define the ResourceTemplate with uriTemplate, name, description
+ * 1. Define the ResourceTemplateType with uriTemplate, name, description
  * 2. Create a handler function that receives extracted params + context
  * 3. Register the template with its handler in the registry
  *
@@ -21,7 +21,7 @@
  * @see https://datatracker.ietf.org/doc/html/rfc6570
  */
 
-import type { ReadResourceResult, ResourceTemplate } from "@modelcontextprotocol/sdk/types.js";
+import type { ReadResourceResult, ResourceTemplateType } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server.js";
 
 // =============================================================================
@@ -46,7 +46,7 @@ export type TemplateHandler = (
  * - log:///2024-01-15 (logs for January 15, 2024)
  * - log:///2024-12-25 (logs for December 25, 2024)
  */
-export const LOG_ENTRIES_TEMPLATE: ResourceTemplate = {
+export const LOG_ENTRIES_TEMPLATE: ResourceTemplateType = {
   uriTemplate: "log:///{date}",
   name: "Log Entries",
   description: "Server activity logs for a specific date (YYYY-MM-DD format)",
@@ -63,7 +63,7 @@ export const LOG_ENTRIES_TEMPLATE: ResourceTemplate = {
  * - config:///tools (tools configuration)
  * - config:///sampling (sampling configuration)
  */
-export const FEATURE_CONFIG_TEMPLATE: ResourceTemplate = {
+export const FEATURE_CONFIG_TEMPLATE: ResourceTemplateType = {
   uriTemplate: "config:///{feature}",
   name: "Feature Configuration",
   description: "Configuration for a specific MCP feature",
@@ -83,7 +83,7 @@ export const FEATURE_CONFIG_TEMPLATE: ResourceTemplate = {
  * Parameters:
  * - {tool} - Tool name (may include : for delegation points like "session_init:client_discovery")
  */
-export const DELEGATION_CONFIG_TEMPLATE: ResourceTemplate = {
+export const DELEGATION_CONFIG_TEMPLATE: ResourceTemplateType = {
   uriTemplate: "delegation:///{tool}",
   name: "Tool Delegation Configuration",
   description: "Delegation configuration for a specific tool or delegation point",
@@ -98,7 +98,7 @@ export const DELEGATION_CONFIG_TEMPLATE: ResourceTemplate = {
  * Template registry entry combining template definition with handler
  */
 interface TemplateRegistryEntry {
-  template: ResourceTemplate;
+  template: ResourceTemplateType;
   handler: TemplateHandler;
 }
 
@@ -106,28 +106,28 @@ interface TemplateRegistryEntry {
  * Template registry - maps URI templates to their handlers
  *
  * Using a Map provides O(1) lookup and maintains insertion order.
- * Each entry combines the ResourceTemplate metadata with its handler function.
+ * Each entry combines the resource template metadata with its handler function.
  */
 const templateRegistry = new Map<string, TemplateRegistryEntry>();
 
 /**
  * Register a resource template with its handler
  */
-export function registerTemplate(template: ResourceTemplate, handler: TemplateHandler): void {
+export function registerTemplate(template: ResourceTemplateType, handler: TemplateHandler): void {
   templateRegistry.set(template.uriTemplate, { template, handler });
 }
 
 /**
  * Get all registered templates
  */
-export function getRegisteredTemplates(): ResourceTemplate[] {
+export function getRegisteredTemplates(): ResourceTemplateType[] {
   return Array.from(templateRegistry.values()).map((entry) => entry.template);
 }
 
 /**
  * All available resource templates (for backward compatibility)
  */
-export const resourceTemplates: ResourceTemplate[] = [
+export const resourceTemplates: ResourceTemplateType[] = [
   LOG_ENTRIES_TEMPLATE,
   FEATURE_CONFIG_TEMPLATE,
   DELEGATION_CONFIG_TEMPLATE,
@@ -136,7 +136,7 @@ export const resourceTemplates: ResourceTemplate[] = [
 /**
  * Register all resource templates
  */
-export function registerResourceTemplates(): ResourceTemplate[] {
+export function registerResourceTemplates(): ResourceTemplateType[] {
   return resourceTemplates;
 }
 
@@ -292,7 +292,9 @@ export async function readFeatureConfig(
   }
 
   // Get session to check feature status
-  const result = await context.provider.getSession();
+  const result = context.sessionId
+    ? await context.provider.getSession(context.sessionId)
+    : { data: null };
   const session = result.data;
 
   if (!session) {

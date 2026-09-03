@@ -9,7 +9,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 
 import {
   createToolkitStorage,

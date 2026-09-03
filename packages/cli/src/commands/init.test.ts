@@ -1,13 +1,15 @@
-import * as providerModule from "@mcp-toolkit/core";
+import { MemoryProvider } from "@mcp-toolkit/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as providerModule from "../provider.js";
 import Init from "./init.js";
 
-// Mock the provider module
-vi.mock("@mcp-toolkit/core", async (importOriginal) => {
+// Swap the CLI's file-backed provider for an in-memory one: these tests are
+// about command output, and should not touch the real session directory.
+vi.mock("../provider.js", async (importOriginal) => {
   const original = await importOriginal<typeof providerModule>();
   return {
     ...original,
-    createMemoryProvider: vi.fn(() => original.createMemoryProvider()),
+    createCliProvider: vi.fn(() => new MemoryProvider()),
   };
 });
 
@@ -18,9 +20,7 @@ describe("Init command", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // Reset to real implementation by default
-    vi.mocked(providerModule.createMemoryProvider).mockImplementation(
-      () => new providerModule.MemoryProvider()
-    );
+    vi.mocked(providerModule.createCliProvider).mockImplementation(() => new MemoryProvider());
     logSpy = vi.spyOn(Init.prototype, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(Init.prototype, "error").mockImplementation((msg) => {
       throw new Error(String(msg));
@@ -127,7 +127,7 @@ describe("Init command", () => {
 
   describe("provider errors", () => {
     it("reports error when provider fails", async () => {
-      vi.mocked(providerModule.createMemoryProvider).mockReturnValue({
+      vi.mocked(providerModule.createCliProvider).mockReturnValue({
         name: "memory",
         hasSession: vi.fn().mockResolvedValue(false),
         getSession: vi.fn().mockResolvedValue({ success: true, data: null }),

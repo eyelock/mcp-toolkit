@@ -1,63 +1,76 @@
 /**
- * Stdio Transport
+ * Stdio Transport (protocol revision 2026-07-28)
  *
  * Standard input/output transport for local development and MCP inspector.
  * Integrates with the hooks system for session lifecycle events.
+ *
+ * Unlike HTTP, stdio genuinely has one client for the life of the process, so
+ * session start/end hooks still mean what they always did here.
+ *
+ * @see https://modelcontextprotocol.io/specification/2026-07-28/basic/transports
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { Server } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { getSessionEndHooks, getSessionStartHooks, type ServerContext } from "../server.js";
+
+/**
+ * Builds a server instance and its context.
+ */
+export type ServerFactory = () => { server: Server; context: ServerContext };
 
 /**
  * Stdio transport options
  */
 export interface StdioTransportOptions {
-  /** Server context for hooks (optional for backwards compatibility) */
-  context?: ServerContext;
+  /**
+   * Refuse 2025-era clients instead of serving them.
+   *
+   * Note the SDK spells the stdio enum `'serve' | 'reject'`, where HTTP uses
+   * `'stateless' | 'reject'`; this flag hides that difference.
+   */
+  rejectLegacy?: boolean;
   /** Callback when session starts with hook content */
-  onSessionStart?: (content: string, sessionId: string) => void;
+  onSessionStart?: (content: string, sessionId: string | null) => void;
   /** Callback when session ends with hook content */
-  onSessionEnd?: (content: string, sessionId: string) => void;
+  onSessionEnd?: (content: string, sessionId: string | null) => void;
 }
 
 /**
  * Create and connect a stdio transport to the server
  *
- * @param server - MCP Server instance
- * @param options - Transport options including context for hooks
+ * @param factory - Builds the server and context to serve this process
+ * @param options - Transport options
  */
 export async function createStdioTransport(
-  server: Server,
+  factory: ServerFactory,
   options: StdioTransportOptions = {}
 ): Promise<void> {
-  const { context, onSessionStart, onSessionEnd } = options;
+  const { rejectLegacy = false, onSessionStart, onSessionEnd } = options;
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // One context for the life of the process - stdio serves a single client.
+  const { context } = factory();
 
-  // Fire session start hooks if context is available
-  if (context) {
-    const { content, sessionId } = await getSessionStartHooks(context);
-    if (onSessionStart) {
-      onSessionStart(content, sessionId);
-    }
-    // Log session start for debugging (stderr so it doesn't interfere with stdio protocol)
-    console.error(`[mcp-toolkit] Session started: ${sessionId}`);
-  }
+  const handle = serveStdio(() => factory().server, {
+    legacy: rejectLegacy ? "reject" : "serve",
+    onerror: (error) => {
+      // stderr, never stdout: stdout carries the protocol.
+      console.error(`[mcp-toolkit] handler error: ${error.message}`);
+    },
+  });
 
-  // Handle graceful shutdown
+  const { content, sessionId } = await getSessionStartHooks(context);
+  onSessionStart?.(content, sessionId);
+  console.error(`[mcp-toolkit] Session started: ${sessionId ?? "(per-request handles)"}`);
+
   const shutdown = async (signal: string) => {
-    // Fire session end hooks if context is available
-    if (context) {
-      const { content, sessionId } = await getSessionEndHooks(context);
-      if (onSessionEnd) {
-        onSessionEnd(content, sessionId);
-      }
-      console.error(`[mcp-toolkit] Session ended: ${sessionId} (${signal})`);
-    }
+    const end = await getSessionEndHooks(context);
+    onSessionEnd?.(end.content, end.sessionId);
+    console.error(
+      `[mcp-toolkit] Session ended: ${end.sessionId ?? "(per-request handles)"} (${signal})`
+    );
 
-    await server.close();
+    await handle.close();
     process.exit(0);
   };
 

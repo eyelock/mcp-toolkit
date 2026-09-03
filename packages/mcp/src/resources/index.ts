@@ -18,10 +18,16 @@ import { getToolkitComponents, getToolkitHandlers } from "@mcp-toolkit/toolkit";
 import type {
   ReadResourceResult,
   Resource,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/types.js";
+  ResourceTemplateType,
+} from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server.js";
-import { readSessionResource, SESSION_RESOURCE_URI, sessionResource } from "./session.js";
+import {
+  readSessionResource,
+  readTemplatedSessionResource,
+  SESSION_RESOURCE_URI,
+  sessionResource,
+  sessionResourceTemplate,
+} from "./session.js";
 import { handleTemplatedResourceRead, registerResourceTemplates } from "./templates.js";
 
 // Re-export templates module
@@ -53,8 +59,12 @@ export function registerResources(): Resource[] {
 /**
  * Register all resource templates (core + toolkit)
  */
-export function getResourceTemplates(): ResourceTemplate[] {
-  return [...registerResourceTemplates(), ...toolkitComponents.resourceTemplates];
+export function getResourceTemplates(): ResourceTemplateType[] {
+  return [
+    sessionResourceTemplate,
+    ...registerResourceTemplates(),
+    ...toolkitComponents.resourceTemplates,
+  ];
 }
 
 /**
@@ -79,6 +89,12 @@ export async function handleResourceRead(
   const reader = coreReaders[uri];
   if (reader) {
     return reader(context);
+  }
+
+  // Handle-addressed sessions: session://{sessionId}
+  const sessionResult = await readTemplatedSessionResource(uri, context);
+  if (sessionResult) {
+    return sessionResult;
   }
 
   // Then try templated resources

@@ -124,6 +124,7 @@ describe("SessionFeaturesSchema", () => {
 describe("SessionConfigSchema", () => {
   it("validates a complete session config", () => {
     const config = {
+      sessionId: "sess-123",
       projectName: "my-project",
       features: {
         tools: true,

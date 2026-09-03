@@ -11,7 +11,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { handleGetPrompt, registerPrompts } from "./prompts/index.js";
 import { handleResourceRead, registerResources } from "./resources/index.js";
 import type { ServerConfig } from "./server.js";
-import { createServer, getSessionEndHooks, getSessionStartHooks } from "./server.js";
+import {
+  createServer,
+  getSessionEndHooks,
+  getSessionStartHooks,
+  resolveSessionId,
+} from "./server.js";
 import { createSessionStateTracker } from "./spec/session-state.js";
 import { handleToolCall, registerTools } from "./tools/index.js";
 
@@ -27,10 +32,8 @@ describe("MCP Server Integration Tests", () => {
       const { server, context } = createServer();
 
       expect(server).toBeDefined();
-      expect(context.sessionId).toBeDefined();
-      expect(context.sessionId).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-      );
+      // No default handle: a server does not own a session, requests address one.
+      expect(context.sessionId).toBeNull();
       expect(context.name).toBe("mcp-toolkit");
       expect(context.version).toBe("0.0.0");
     });
@@ -44,7 +47,7 @@ describe("MCP Server Integration Tests", () => {
           canonicalName: "custom-canonical",
           tags: { env: "test" },
         },
-        sessionId: "fixed-session-id",
+        defaultSessionId: "fixed-session-id",
       };
 
       const { context } = createServer(customConfig);
@@ -101,7 +104,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles unknown tool gracefully", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       const result = await handleToolCall("unknown_tool", {}, context);
 
@@ -111,7 +114,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("invokes session_init tool successfully", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       const result = await handleToolCall("session_init", { projectName: "test-project" }, context);
 
@@ -138,7 +141,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("invokes session_status tool successfully", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Initialize session first
       await handleToolCall("session_init", { projectName: "status-test" }, context);
@@ -152,7 +155,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("returns informative message when no session exists", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       const result = await handleToolCall("session_status", {}, context);
 
@@ -163,7 +166,7 @@ describe("MCP Server Integration Tests", () => {
 
   describe("Tool Invocation Flow", () => {
     it("completes full session workflow: init -> status -> clear", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Step 1: Initialize session
       const initResult = await handleToolCall(
@@ -183,7 +186,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles sequential tool calls with state persistence", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Initialize with project name
       await handleToolCall("session_init", { projectName: "state-test" }, context);
@@ -211,7 +214,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles resource read requests", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Initialize session first (some resources may require it)
       await handleToolCall("session_init", { projectName: "resource-test" }, context);
@@ -234,7 +237,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles prompt requests", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
       const prompts = registerPrompts();
 
       if (prompts.length > 0) {
@@ -248,54 +251,63 @@ describe("MCP Server Integration Tests", () => {
   });
 
   describe("Session State Tracking", () => {
-    it("tracks session state across requests", () => {
+    it("exposes a tracker and no ambient session", () => {
       const { context } = createServer({ provider });
 
       expect(context.sessionStateTracker).toBeDefined();
-      expect(context.sessionId).toBeDefined();
+      expect(context.sessionId).toBeNull();
     });
 
-    it("generates unique session IDs when not provided", () => {
-      const { context: context1 } = createServer({ provider });
-      const { context: context2 } = createServer({ provider: createMemoryProvider() });
+    it("has no default handle unless one is configured", () => {
+      const { context } = createServer({ provider });
 
-      expect(context1.sessionId).not.toBe(context2.sessionId);
+      expect(context.sessionId).toBeNull();
     });
 
-    it("uses provided session ID when specified", () => {
-      const customSessionId = "custom-session-12345";
-      const { context } = createServer({
-        provider,
-        sessionId: customSessionId,
-      });
+    it("uses the configured default handle", () => {
+      const { context } = createServer({ provider, defaultSessionId: "custom-session-12345" });
 
-      expect(context.sessionId).toBe(customSessionId);
+      expect(context.sessionId).toBe("custom-session-12345");
     });
 
-    it("enforces tool initialization requirements", () => {
+    it("resolves an explicit handle over the server default", () => {
+      const { context } = createServer({ provider, defaultSessionId: "server-default" });
+
+      expect(resolveSessionId({ session_id: "from-request" }, context)).toBe("from-request");
+      expect(resolveSessionId({}, context)).toBe("server-default");
+    });
+
+    it("resolves to null when neither is present", () => {
+      const { context } = createServer({ provider });
+
+      expect(resolveSessionId({}, context)).toBeNull();
+    });
+
+    it("enforces tool initialization requirements against storage", async () => {
       const tracker = createSessionStateTracker("session_init", ["protected_tool"]);
-      tracker.setSessionId("test-session");
 
-      // Before init, protected tool should be blocked
-      const blockMessage = tracker.checkToolAllowed("protected_tool", "req-1");
-      expect(blockMessage).toContain("session_init");
+      // Unknown handle -> blocked
+      expect(await tracker.checkToolAllowed("protected_tool", "nope", provider)).toContain(
+        "session_init"
+      );
 
-      // After init, it should be allowed
-      tracker.recordToolCall("session_init", "req-2");
-      const allowedMessage = tracker.checkToolAllowed("protected_tool", "req-3");
-      expect(allowedMessage).toBeNull();
+      // Once the session exists in storage -> allowed
+      const created = await provider.initSession({ projectName: "test-project" });
+      expect(
+        await tracker.checkToolAllowed("protected_tool", created.data?.sessionId ?? "", provider)
+      ).toBeNull();
     });
   });
 
   describe("Request ID Tracking", () => {
     it("initializes with null request ID", () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       expect(context.currentRequestId).toBeNull();
     });
 
     it("tracks request ID through context", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Simulate setting request ID (normally done by server handler)
       context.currentRequestId = "test-request-id";
@@ -306,7 +318,7 @@ describe("MCP Server Integration Tests", () => {
 
   describe("Session Hooks", () => {
     it("returns session start hooks content", async () => {
-      const { context } = createServer({ provider, sessionId: "hook-session" });
+      const { context } = createServer({ provider, defaultSessionId: "hook-session" });
 
       const hooks = await getSessionStartHooks(context);
 
@@ -316,7 +328,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("returns session end hooks content", async () => {
-      const { context } = createServer({ provider, sessionId: "hook-session" });
+      const { context } = createServer({ provider, defaultSessionId: "hook-session" });
 
       const hooks = await getSessionEndHooks(context);
 
@@ -326,7 +338,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("includes request ID in session start hooks", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
       context.currentRequestId = "current-request";
 
       const hooks = await getSessionStartHooks(context);
@@ -337,7 +349,7 @@ describe("MCP Server Integration Tests", () => {
 
   describe("Error Handling", () => {
     it("handles tool invocation errors gracefully", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Call with invalid arguments that should cause validation error
       const result = await handleToolCall("session_init", { invalid: "args" }, context);
@@ -347,7 +359,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles resource read for non-existent URI", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       const result = await handleResourceRead("non-existent://resource", context);
 
@@ -356,7 +368,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("handles prompt request for non-existent prompt", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       const result = await handleGetPrompt("non-existent-prompt", {}, context);
 
@@ -429,7 +441,7 @@ describe("MCP Server Integration Tests", () => {
 
   describe("Concurrent Requests", () => {
     it("handles multiple concurrent tool calls", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       // Initialize first
       await handleToolCall("session_init", { projectName: "concurrent-test" }, context);
@@ -448,7 +460,7 @@ describe("MCP Server Integration Tests", () => {
     });
 
     it("maintains session state during concurrent operations", async () => {
-      const { context } = createServer({ provider });
+      const { context } = createServer({ provider, defaultSessionId: "test-session" });
 
       await handleToolCall("session_init", { projectName: "concurrent-state" }, context);
 
@@ -465,6 +477,74 @@ describe("MCP Server Integration Tests", () => {
       for (const result of results) {
         expect(result).toBeDefined();
       }
+    });
+  });
+
+  describe("Per-request session isolation", () => {
+    // The stateless protocol lets several requests be in flight at once. The
+    // server builds a fresh context per request rather than assigning onto a
+    // shared one; if it ever regresses to mutation, these interleave and fail.
+    it("keeps concurrent requests on their own sessions", async () => {
+      const { context } = createServer({ provider });
+
+      const alpha = await provider.initSession({ projectName: "alpha" });
+      const beta = await provider.initSession({ projectName: "beta" });
+      const alphaId = alpha.data?.sessionId ?? "";
+      const betaId = beta.data?.sessionId ?? "";
+
+      const [resultA, resultB] = await Promise.all([
+        handleToolCall(
+          "session_status",
+          { session_id: alphaId },
+          { ...context, sessionId: resolveSessionId({ session_id: alphaId }, context) }
+        ),
+        handleToolCall(
+          "session_status",
+          { session_id: betaId },
+          { ...context, sessionId: resolveSessionId({ session_id: betaId }, context) }
+        ),
+      ]);
+
+      expect((resultA.content[0] as { text: string }).text).toContain("alpha");
+      expect((resultA.content[0] as { text: string }).text).not.toContain("beta");
+      expect((resultB.content[0] as { text: string }).text).toContain("beta");
+      expect((resultB.content[0] as { text: string }).text).not.toContain("alpha");
+    });
+
+    it("refuses a session tool when no handle is available", async () => {
+      const { context } = createServer({ provider });
+
+      const result = await handleToolCall(
+        "session_status",
+        {},
+        {
+          ...context,
+          sessionId: resolveSessionId({}, context),
+        }
+      );
+
+      expect(result.isError).toBe(true);
+      expect((result.content[0] as { text: string }).text).toContain("session_id");
+    });
+
+    it("serves a handle minted by a different server instance", async () => {
+      // Two servers, one shared store - the multi-instance case.
+      const { context: instanceA } = createServer({ provider });
+      const { context: instanceB } = createServer({ provider });
+
+      const created = await instanceA.provider.initSession({ projectName: "shared" });
+      const handle = created.data?.sessionId ?? "";
+
+      const result = await handleToolCall(
+        "session_status",
+        { session_id: handle },
+        {
+          ...instanceB,
+          sessionId: resolveSessionId({ session_id: handle }, instanceB),
+        }
+      );
+
+      expect((result.content[0] as { text: string }).text).toContain("shared");
     });
   });
 });

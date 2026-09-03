@@ -4,7 +4,7 @@
  * Provides access to the current domain model via MCP resource.
  */
 
-import type { ReadResourceResult, Resource } from "@modelcontextprotocol/sdk/types.js";
+import type { ReadResourceResult, Resource } from "@modelcontextprotocol/server";
 import { createToolkitStorage } from "../model/index.js";
 
 /**

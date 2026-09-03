@@ -66,6 +66,12 @@ export const SessionFeaturesSchema = z
  */
 export const SessionConfigSchema = z
   .object({
+    sessionId: z
+      .string()
+      .min(1)
+      .describe(
+        "Unique identifier for this session. Under the stateless protocol this is the explicit handle: the server mints it, returns it, and clients thread it back on subsequent calls."
+      ),
     projectName: z
       .string()
       .min(1)
@@ -103,12 +109,56 @@ export const SessionInitInputSchema = SessionConfigSchema.pick({
 });
 
 /**
+ * The session handle, as it travels on a request.
+ *
+ * Under the stateless protocol a tool that operates on an existing session must
+ * be told which one. The server mints the handle in `session_init` and returns
+ * it; the model threads it back here. Optional so that single-session
+ * transports (stdio) can fall back to a process default.
+ */
+export const SessionHandleSchema = z.object({
+  session_id: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Session handle returned by session_init. Required when the server serves more than one session (HTTP); optional over stdio, which has a single session per process."
+    ),
+});
+
+/**
+ * Input schema for session storage.
+ *
+ * Derived from the tool input by dropping `discoverClient`, which asks whether
+ * the *tool* should discover client metadata via sampling. That is a tool
+ * concern; by the time a session reaches storage the question is already
+ * answered, so the storage layer never sees it.
+ */
+export const SessionCreateInputSchema = SessionInitInputSchema.omit({
+  discoverClient: true,
+});
+
+/**
  * Input schema for session update
- * Partial version of the config - all fields optional
+ * Partial version of the config - all fields optional.
+ *
+ * `sessionId` is omitted: the handle identifies which session to update and is
+ * therefore an argument to the provider, never a mutable field.
+ *
+ * `features` is re-declared as partial because providers *merge* features
+ * rather than replacing them - without this, changing one flag would demand
+ * restating all four.
  */
 export const SessionUpdateInputSchema = SessionConfigSchema.omit({
+  sessionId: true,
   createdAt: true,
-}).partial();
+})
+  .partial()
+  .extend({
+    features: SessionFeaturesSchema.partial()
+      .optional()
+      .describe("Features to change; unspecified features keep their current value"),
+  });
 
 // =============================================================================
 // Type Exports
@@ -119,6 +169,8 @@ export type ServerIdentity = z.infer<typeof ServerIdentitySchema>;
 export type SessionFeatures = z.infer<typeof SessionFeaturesSchema>;
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;
 export type SessionInitInput = z.infer<typeof SessionInitInputSchema>;
+export type SessionCreateInput = z.infer<typeof SessionCreateInputSchema>;
+export type SessionHandle = z.infer<typeof SessionHandleSchema>;
 export type SessionUpdateInput = z.infer<typeof SessionUpdateInputSchema>;
 
 // =============================================================================

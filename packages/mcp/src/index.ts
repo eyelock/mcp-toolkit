@@ -12,6 +12,10 @@
  *   mcp-toolkit --http                       # HTTP mode on port 3000
  *   mcp-toolkit --http --port 8080 --host 0.0.0.0
  *   mcp-toolkit --http --token secret123
+ *   mcp-toolkit --http --allow-origin https://app.example.com
+ *   mcp-toolkit --modern-only                # refuse 2025-era clients
+ *   mcp-toolkit --http --storage file        # share sessions across instances
+ *   mcp-toolkit --http --storage file --storage-dir /var/lib/mcp
  *   mcp-toolkit --dev                        # adds env=development tag
  *   mcp-toolkit --tag env=staging --tag team=platform
  *
@@ -19,7 +23,9 @@
  *   MCP_TAGS - Comma-separated tags (e.g., "env=development,team=platform")
  */
 
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import { createFileProvider, createMemoryProvider, type SessionProvider } from "@mcp-toolkit/core";
 import type { ServerTags } from "@mcp-toolkit/model";
 import { createServer } from "./server.js";
 import {
@@ -46,6 +52,39 @@ const { version: VERSION } = require("../package.json") as { version: string };
  * @param args - CLI arguments
  * @returns Merged tags object
  */
+/**
+ * Choose the session store.
+ *
+ * Memory is the default because it needs nothing, and it is correct for stdio -
+ * one process owns the conversation. Over HTTP it is a footgun: sessions live in
+ * one process's heap, so a second replica cannot see them. We warn rather than
+ * silently switching, since a surprising default is worse than an explicit one.
+ */
+function parseStorage(args: string[], mode: string): SessionProvider {
+  const kindIndex = args.indexOf("--storage");
+  const kind = kindIndex !== -1 ? args[kindIndex + 1] : "memory";
+
+  if (kind === "file") {
+    const dirIndex = args.indexOf("--storage-dir");
+    const directory = dirIndex !== -1 ? args[dirIndex + 1] : undefined;
+    return createFileProvider(directory ? { directory } : {});
+  }
+
+  if (kind !== "memory") {
+    console.error(`[mcp-toolkit] Unknown --storage "${kind}"; falling back to memory.`);
+  }
+
+  if (mode === "http") {
+    console.error(
+      "[mcp-toolkit] Using in-memory sessions over HTTP: correct for a single instance only. " +
+        "Pass --storage file to share sessions across processes, or supply a RedisProvider " +
+        "for multiple hosts."
+    );
+  }
+
+  return createMemoryProvider();
+}
+
 function parseTags(args: string[]): ServerTags {
   const tags: ServerTags = {};
 
@@ -93,22 +132,38 @@ async function main(): Promise<void> {
   const options = parseTransportArgs(args);
   const tags = parseTags(args);
 
-  const { server, context } = createServer({
-    name: CANONICAL_NAME,
-    version: VERSION,
-    identity: {
-      canonicalName: CANONICAL_NAME,
-      tags,
-    },
-  });
+  // A factory, not an instance: the stateless protocol lets the SDK build a
+  // server per request, which is what allows requests to be spread across
+  // instances without sticky routing.
+  // One provider, shared by every server the factory builds - that is what
+  // makes the instances interchangeable.
+  const provider = parseStorage(args, options.mode);
+
+  // stdio serves one conversation per process, so a process-wide default handle
+  // is correct there and saves the model from threading session_id on every
+  // call. HTTP gets no default: any instance may serve any request, so the
+  // handle has to travel *in* the request or it means nothing.
+  const defaultSessionId = options.mode === "stdio" ? randomUUID() : undefined;
+
+  const factory = () =>
+    createServer({
+      name: CANONICAL_NAME,
+      version: VERSION,
+      provider,
+      defaultSessionId,
+      identity: {
+        canonicalName: CANONICAL_NAME,
+        tags,
+      },
+    });
 
   if (options.mode === "http") {
-    await createHttpTransport(server, {
+    await createHttpTransport(factory, {
       ...options.httpConfig,
-      context,
+      rejectLegacy: options.rejectLegacy,
     });
   } else {
-    await createStdioTransport(server, { context });
+    await createStdioTransport(factory, { rejectLegacy: options.rejectLegacy });
   }
 }
 

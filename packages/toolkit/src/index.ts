@@ -35,9 +35,9 @@ import type {
   Prompt,
   ReadResourceResult,
   Resource,
-  ResourceTemplate,
+  ResourceTemplateType,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 
 // ===========================================================================
 // Re-exports
@@ -228,7 +228,7 @@ export function markToolkitConfigured(
 export interface ToolkitComponents {
   tools: Tool[];
   resources: Resource[];
-  resourceTemplates: ResourceTemplate[];
+  resourceTemplates: ResourceTemplateType[];
   prompts: Prompt[];
 }
 

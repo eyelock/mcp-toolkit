@@ -39,9 +39,10 @@ export const ExecutionStrategySchema = DelegationModeSchema;
  * Execution outcome for tracking what path was taken
  */
 export const ExecutionOutcomeSchema = z
-  .enum(["delegated", "local", "fallback-local", "error"])
+  .enum(["pending", "delegated", "local", "fallback-local", "error"])
   .describe(
-    "Outcome of strategy execution: delegated (LLM handled), local (handled locally), " +
+    "Outcome of strategy execution: pending (asked the host LLM, awaiting its answer), " +
+      "delegated (LLM handled), local (handled locally), " +
       "fallback-local (delegation failed, fell back), error (both failed)"
   );
 
@@ -154,6 +155,12 @@ export const DelegationResultSchema = z
   .object({
     outcome: ExecutionOutcomeSchema.describe("Which execution path was taken"),
     result: z.unknown().describe("The actual execution result"),
+    request: z
+      .unknown()
+      .optional()
+      .describe(
+        "When outcome is 'pending', the InputRequiredResult the handler must return so the client can answer"
+      ),
     delegationAttempted: z.boolean().describe("Whether delegation was attempted"),
     delegationError: z.string().optional().describe("Error message if delegation failed"),
     executionTimeMs: z.number().nonnegative().describe("Total execution time in milliseconds"),

@@ -145,7 +145,7 @@ describe("handleGenerate", () => {
       const result = await handleGenerate({ tier: "definitions", dryRun: true }, {});
 
       expect(result.content[0].text).toContain("userTemplate");
-      expect(result.content[0].text).toContain("ResourceTemplate");
+      expect(result.content[0].text).toContain("ResourceTemplateType");
     });
   });
 

@@ -17,6 +17,10 @@
     "./storage": {
       "types": "./dist/storage/index.d.ts",
       "import": "./dist/storage/index.js"
+    },
+    "./testing": {
+      "types": "./dist/storage/conformance.d.ts",
+      "import": "./dist/storage/conformance.js"
     }
   },
   "files": [
@@ -47,5 +51,13 @@
     "mcp",
     "hooks",
     "workflows"
-  ]
+  ],
+  "peerDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  }
 }

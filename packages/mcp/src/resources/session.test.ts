@@ -7,7 +7,7 @@ describe("Session Resource", () => {
   let context: ServerContext;
 
   beforeEach(() => {
-    context = { provider: createMemoryProvider() };
+    context = { provider: createMemoryProvider(), sessionId: "test-session" };
   });
 
   describe("sessionResource", () => {
@@ -44,7 +44,7 @@ describe("Session Resource", () => {
     });
 
     it("returns session data when session exists", async () => {
-      await context.provider.initSession({ projectName: "test-project" });
+      await context.provider.initSession({ projectName: "test-project" }, context.sessionId);
 
       const result = await readSessionResource(context);
 

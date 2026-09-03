@@ -4,12 +4,12 @@
  * Provides access to client configuration examples via MCP resource templates.
  */
 
-import type { ReadResourceResult, ResourceTemplate } from "@modelcontextprotocol/sdk/types.js";
+import type { ReadResourceResult, ResourceTemplateType } from "@modelcontextprotocol/server";
 
 /**
  * Resource template for client configurations
  */
-export const clientsResourceTemplate: ResourceTemplate = {
+export const clientsResourceTemplate: ResourceTemplateType = {
   uriTemplate: "toolkit://clients/{name}/config",
   name: "Client Configurations",
   description: "Example configurations for different MCP clients",

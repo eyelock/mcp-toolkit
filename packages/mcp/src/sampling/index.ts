@@ -19,7 +19,7 @@
  * @see https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
  */
 
-import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageRequest } from "@modelcontextprotocol/server";
 
 /**
  * Create a sampling request for generating a project description

@@ -12,7 +12,7 @@ describe("Welcome Prompts", () => {
   let context: ServerContext;
 
   beforeEach(() => {
-    context = { provider: createMemoryProvider() };
+    context = { provider: createMemoryProvider(), sessionId: "test-session" };
   });
 
   describe("welcomePrompt", () => {
@@ -35,7 +35,7 @@ describe("Welcome Prompts", () => {
     });
 
     it("returns session info when session exists", async () => {
-      await context.provider.initSession({ projectName: "test-project" });
+      await context.provider.initSession({ projectName: "test-project" }, context.sessionId);
 
       const result = await getWelcomePrompt(undefined, context);
 
@@ -45,10 +45,13 @@ describe("Welcome Prompts", () => {
     });
 
     it("shows features list when session has enabled features", async () => {
-      await context.provider.initSession({
-        projectName: "test-project",
-        features: { tools: true, resources: true, prompts: false, sampling: false },
-      });
+      await context.provider.initSession(
+        {
+          projectName: "test-project",
+          features: { tools: true, resources: true, prompts: false, sampling: false },
+        },
+        context.sessionId
+      );
 
       const result = await getWelcomePrompt(undefined, context);
 
@@ -58,10 +61,13 @@ describe("Welcome Prompts", () => {
     });
 
     it("shows 'none enabled' when no features are enabled", async () => {
-      await context.provider.initSession({
-        projectName: "test-project",
-        features: { tools: false, resources: false, prompts: false, sampling: false },
-      });
+      await context.provider.initSession(
+        {
+          projectName: "test-project",
+          features: { tools: false, resources: false, prompts: false, sampling: false },
+        },
+        context.sessionId
+      );
 
       const result = await getWelcomePrompt(undefined, context);
 
@@ -102,7 +108,7 @@ describe("Welcome Prompts", () => {
     });
 
     it("asks about existing session when one exists", async () => {
-      await context.provider.initSession({ projectName: "existing-project" });
+      await context.provider.initSession({ projectName: "existing-project" }, context.sessionId);
 
       const result = await getSessionSetupPrompt(undefined, context);
 

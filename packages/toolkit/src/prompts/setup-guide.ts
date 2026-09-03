@@ -4,7 +4,7 @@
  * Provides guidance for setting up MCP clients.
  */
 
-import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult, Prompt } from "@modelcontextprotocol/server";
 
 /**
  * Prompt for setup guidance

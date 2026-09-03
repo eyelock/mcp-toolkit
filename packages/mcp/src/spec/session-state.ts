@@ -1,23 +1,32 @@
 /**
  * Session State Management
  *
- * Generic session state tracking for MCP servers. Provides a pattern for
- * enforcing workflow requirements (e.g., mandatory initialization) through
- * server-side state management.
+ * Enforces workflow requirements - "you must call session_init before using
+ * this tool" - under the stateless protocol.
  *
- * This complements prompt-based guidance with actual enforcement.
+ * ## Why this holds no state
+ *
+ * The previous version kept `state`, `initAt` and `sessionId` as private fields
+ * and asked *"do I remember this caller running session_init?"*. That answer
+ * lives in one process's heap, so it silently fails open the moment a second
+ * replica serves a request, and it is exactly what MCP `2026-07-28` removed.
+ *
+ * The question is now *"does the handle on this request resolve to an
+ * initialized session?"*, answered by reading shared storage. That is not
+ * weaker - it is enforced across restarts and across instances, which the
+ * in-memory version never was.
+ *
+ * @see https://modelcontextprotocol.io/specification/2026-07-28
  */
 
+import type { SessionConsumer } from "@mcp-toolkit/core";
+
 /**
- * Base session states
- *
- * Servers can extend this with custom states if needed.
+ * Session states, derived from storage rather than remembered.
  */
 export type SessionState =
-  | "uninitialized" // No init tool called yet
-  | "initialized" // Init tool called, ready for work
-  | "ready" // Optional intermediate state
-  | "working"; // Normal operation
+  | "uninitialized" // No handle, or the handle resolves to nothing
+  | "initialized"; // The handle resolves to a stored session
 
 /**
  * Tool allowance configuration
@@ -27,36 +36,6 @@ export interface ToolAllowanceConfig {
   initTools: Set<string>;
   /** Tools that require initialization first */
   requiresInit: Set<string>;
-  /** Tools that trigger state transitions */
-  transitionTriggers: Map<string, SessionState>;
-}
-
-/**
- * Result of a state transition
- */
-export interface StateTransitionResult {
-  /** State before the transition */
-  previousState: SessionState;
-  /** State after the transition */
-  newState: SessionState;
-  /** Whether a transition occurred */
-  transitioned: boolean;
-  /** Optional guidance message for the LLM */
-  guidance?: string;
-}
-
-/**
- * Session timing information
- */
-export interface SessionTimingInfo {
-  /** Current session state */
-  state: SessionState;
-  /** When initialization occurred */
-  initAt: number | null;
-  /** Session ID (from MCP or generated) */
-  sessionId: string | null;
-  /** Current request ID */
-  requestId: string | null;
 }
 
 /**
@@ -75,175 +54,87 @@ export class WorkflowViolationError extends Error {
 }
 
 /**
- * Session state tracker class
+ * Session state policy.
  *
- * Provides state management for enforcing workflow requirements.
- * Create one instance per session (or use the singleton pattern).
+ * Holds the rules, never the state. Safe to share across concurrent requests
+ * precisely because it has nothing per-request to corrupt.
  *
  * @example
  * ```typescript
- * const tracker = new SessionStateTracker({
- *   initTools: new Set(["session_init", "server_info"]),
- *   requiresInit: new Set(["my_tool", "other_tool"]),
- *   transitionTriggers: new Map([["session_init", "initialized"]]),
- * });
+ * const tracker = createSessionStateTracker("session_init", ["my_tool"]);
  *
- * // Before tool execution
- * const error = tracker.checkToolAllowed("my_tool", requestId);
- * if (error) {
- *   return { isError: true, content: [{ type: "text", text: error }] };
- * }
- *
- * // After tool execution
- * const result = tracker.recordToolCall("session_init");
- * if (result.guidance) {
- *   // Include in response
+ * const blocked = await tracker.checkToolAllowed("my_tool", sessionId, provider);
+ * if (blocked) {
+ *   return { isError: true, content: [{ type: "text", text: blocked }] };
  * }
  * ```
  */
 export class SessionStateTracker {
-  private state: SessionState = "uninitialized";
-  private initAt: number | null = null;
-  private sessionId: string | null = null;
-  private currentRequestId: string | null = null;
-  private config: ToolAllowanceConfig;
+  private readonly config: ToolAllowanceConfig;
 
   constructor(config: ToolAllowanceConfig) {
     this.config = config;
   }
 
-  /**
-   * Get current session state
-   */
-  getState(): SessionState {
-    return this.state;
+  /** Whether this tool may be called before a session exists */
+  isInitTool(toolName: string): boolean {
+    return this.config.initTools.has(toolName);
+  }
+
+  /** Whether this tool demands an initialized session */
+  requiresInit(toolName: string): boolean {
+    return this.config.requiresInit.has(toolName);
   }
 
   /**
-   * Set the session ID
+   * Derive the state of a session from storage.
    */
-  setSessionId(sessionId: string): void {
-    this.sessionId = sessionId;
-  }
-
-  /**
-   * Get the session ID
-   */
-  getSessionId(): string | null {
-    return this.sessionId;
-  }
-
-  /**
-   * Check if a tool call is allowed given current state
-   *
-   * @param toolName - Name of the tool being called
-   * @param requestId - Optional request identifier
-   * @returns null if allowed, or an error message if blocked
-   */
-  checkToolAllowed(toolName: string, requestId?: string): string | null {
-    // Track request
-    if (requestId) {
-      this.currentRequestId = requestId;
+  async getState(sessionId: string | null, consumer: SessionConsumer): Promise<SessionState> {
+    if (!sessionId) {
+      return "uninitialized";
     }
+    return (await consumer.hasSession(sessionId)) ? "initialized" : "uninitialized";
+  }
 
-    // Init tools are always allowed
-    if (this.config.initTools.has(toolName)) {
+  /**
+   * Check whether a tool call is allowed.
+   *
+   * @param toolName - Tool being called
+   * @param sessionId - Handle from the request, or null when none was supplied
+   * @param consumer - Storage to resolve the handle against
+   * @returns null if allowed, or a message explaining what to do instead
+   */
+  async checkToolAllowed(
+    toolName: string,
+    sessionId: string | null,
+    consumer: SessionConsumer
+  ): Promise<string | null> {
+    // Init tools are always allowed - they are how a session comes to exist.
+    if (this.isInitTool(toolName)) {
       return null;
     }
 
-    // Check if tool requires initialization
-    if (this.config.requiresInit.has(toolName) && this.state === "uninitialized") {
-      const initToolNames = Array.from(this.config.initTools).join(" or ");
-      return `Tool "${toolName}" requires session initialization. You MUST call ${initToolNames} first before using this tool.`;
+    if (!this.requiresInit(toolName)) {
+      return null;
+    }
+
+    const initToolNames = Array.from(this.config.initTools).join(" or ");
+
+    if (!sessionId) {
+      return (
+        `Tool "${toolName}" requires an initialized session, but no session_id was supplied. ` +
+        `Call ${initToolNames} first, then pass the returned session_id to this tool.`
+      );
+    }
+
+    if (!(await consumer.hasSession(sessionId))) {
+      return (
+        `Tool "${toolName}" requires an initialized session, but session_id "${sessionId}" ` +
+        `is unknown or has expired. Call ${initToolNames} to start a new session.`
+      );
     }
 
     return null;
-  }
-
-  /**
-   * Record that a tool was called, updating state as needed
-   *
-   * @param toolName - Name of the tool being called
-   * @param requestId - Optional request identifier
-   * @returns State transition result with guidance
-   */
-  recordToolCall(toolName: string, requestId?: string): StateTransitionResult {
-    // Track request
-    if (requestId) {
-      this.currentRequestId = requestId;
-    }
-
-    const previousState = this.state;
-
-    // Check for state transitions
-    const newState = this.config.transitionTriggers.get(toolName);
-    if (newState && this.state !== newState) {
-      this.state = newState;
-
-      if (newState === "initialized" && previousState === "uninitialized") {
-        this.initAt = Date.now();
-        return {
-          previousState,
-          newState: this.state,
-          transitioned: true,
-          guidance: "Session initialized. Ready to work.",
-        };
-      }
-
-      return {
-        previousState,
-        newState: this.state,
-        transitioned: true,
-      };
-    }
-
-    // Transition to working state on first real work
-    if (
-      (this.state === "ready" || this.state === "initialized") &&
-      !this.config.initTools.has(toolName)
-    ) {
-      this.state = "working";
-      return {
-        previousState,
-        newState: this.state,
-        transitioned: previousState !== this.state,
-      };
-    }
-
-    return {
-      previousState,
-      newState: this.state,
-      transitioned: false,
-    };
-  }
-
-  /**
-   * Reset session state (for testing or new sessions)
-   */
-  reset(): void {
-    this.state = "uninitialized";
-    this.initAt = null;
-    this.sessionId = null;
-    this.currentRequestId = null;
-  }
-
-  /**
-   * Get session timing info
-   */
-  getTimingInfo(): SessionTimingInfo {
-    return {
-      state: this.state,
-      initAt: this.initAt,
-      sessionId: this.sessionId,
-      requestId: this.currentRequestId,
-    };
-  }
-
-  /**
-   * Check if session is initialized
-   */
-  isInitialized(): boolean {
-    return this.state !== "uninitialized";
   }
 }
 
@@ -252,7 +143,6 @@ export class SessionStateTracker {
  *
  * @param initTool - The tool name that initializes the session (default: "session_init")
  * @param requiresInitTools - Tools that require initialization
- * @returns Configured SessionStateTracker
  */
 export function createSessionStateTracker(
   initTool = "session_init",
@@ -261,7 +151,6 @@ export function createSessionStateTracker(
   return new SessionStateTracker({
     initTools: new Set([initTool, "server_info"]),
     requiresInit: new Set(requiresInitTools),
-    transitionTriggers: new Map([[initTool, "initialized"]]),
   });
 }
 
@@ -269,9 +158,6 @@ export function createSessionStateTracker(
  * Create a blocking response for workflow violations
  *
  * Helper for creating properly formatted error responses.
- *
- * @param message - Error message
- * @returns MCP-formatted error response
  */
 export function createBlockingResponse(message: string): {
   isError: true;

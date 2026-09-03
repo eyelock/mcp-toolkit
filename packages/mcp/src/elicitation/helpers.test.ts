@@ -1,402 +1,364 @@
 /**
- * Elicitation Helpers Tests
+ * Elicitation helpers, in the pull model.
+ *
+ * Each helper is called twice in these tests: once with no answers (it should
+ * ask) and once with the answer attached (it should proceed). That is exactly
+ * how a handler runs across the two rounds of a real request.
  */
 
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { Mock } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isInputRequiredResult } from "@modelcontextprotocol/server";
+import { describe, expect, it } from "vitest";
+import type { ServerContext } from "../server.js";
 import {
-  clientSupportsElicitation,
-  DEFAULT_ELICITATION_TIMEOUT_MS,
+  canElicit,
+  carryForward,
+  choiceRequest,
+  confirmationRequest,
   ElicitationDeclinedError,
   ElicitationNotSupportedError,
-  ElicitationValidationError,
+  elicitAll,
   elicitChoice,
   elicitConfirmation,
   elicitInput,
   elicitText,
-  getElicitationTimeout,
+  readResponse,
+  requestInput,
+  textRequest,
 } from "./helpers.js";
 
-/**
- * Mock server type for testing elicitation functionality
- */
-interface MockServer extends Partial<Server> {
-  _clientCapabilities?: { elicitation?: { form?: boolean } };
-  elicitInput: Mock;
+/** A first-round context: the handler has not asked anything yet. */
+const firstRound = {} as Pick<ServerContext, "inputResponses">;
+
+/** A second-round context carrying an accepted answer under `key`. */
+function withAnswer(key: string, content: Record<string, unknown>) {
+  return {
+    inputResponses: { [key]: { kind: "elicit", action: "accept", content } },
+  } as unknown as Pick<ServerContext, "inputResponses">;
 }
 
-describe("Elicitation Helpers", () => {
-  describe("getElicitationTimeout", () => {
-    const originalEnv = process.env.MCP_ELICITATION_TIMEOUT_MS;
+/** A second-round context where the user declined. */
+function withDecline(key: string) {
+  return {
+    inputResponses: { [key]: { kind: "elicit", action: "decline" } },
+  } as unknown as Pick<ServerContext, "inputResponses">;
+}
 
-    afterEach(() => {
-      if (originalEnv === undefined) {
-        process.env.MCP_ELICITATION_TIMEOUT_MS = undefined;
-      } else {
-        process.env.MCP_ELICITATION_TIMEOUT_MS = originalEnv;
-      }
+describe("elicitConfirmation", () => {
+  it("asks on the first round", () => {
+    const outcome = elicitConfirmation(firstRound, "confirm", "Delete this item?");
+
+    expect(outcome.status).toBe("pending");
+    if (outcome.status !== "pending") return;
+    expect(isInputRequiredResult(outcome.result)).toBe(true);
+    expect(outcome.result.inputRequests?.confirm).toBeDefined();
+  });
+
+  it("resolves true once accepted", () => {
+    const outcome = elicitConfirmation(withAnswer("confirm", { confirm: true }), "confirm", "?");
+
+    expect(outcome).toEqual({ status: "ready", value: true });
+  });
+
+  it("resolves false when the user says no", () => {
+    const outcome = elicitConfirmation(withAnswer("confirm", { confirm: false }), "confirm", "?");
+
+    expect(outcome).toEqual({ status: "ready", value: false });
+  });
+
+  it("asks again when the user declined to answer", () => {
+    // Declining is not the same as answering "no" - there is no value to use.
+    const outcome = elicitConfirmation(withDecline("confirm"), "confirm", "?");
+
+    expect(outcome.status).toBe("pending");
+  });
+});
+
+describe("elicitText", () => {
+  it("asks on the first round", () => {
+    const outcome = elicitText(firstRound, "name", "Your name?");
+
+    expect(outcome.status).toBe("pending");
+  });
+
+  it("unwraps the value once accepted", () => {
+    const outcome = elicitText(withAnswer("name", { value: "Ada" }), "name", "Your name?");
+
+    expect(outcome).toEqual({ status: "ready", value: "Ada" });
+  });
+
+  it("carries an optional description into the schema", () => {
+    const outcome = elicitText(firstRound, "name", "Your name?", { description: "Full name" });
+
+    if (outcome.status !== "pending") throw new Error("expected pending");
+    const request = outcome.result.inputRequests?.name as {
+      params: { requestedSchema: { properties: { value: { description?: string } } } };
+    };
+    expect(request.params.requestedSchema.properties.value.description).toBe("Full name");
+  });
+});
+
+describe("elicitChoice", () => {
+  const choices = [
+    { value: "low" as const, label: "Low" },
+    { value: "high" as const, label: "High" },
+  ];
+
+  it("asks on the first round", () => {
+    const outcome = elicitChoice(firstRound, "priority", "Priority?", choices);
+
+    expect(outcome.status).toBe("pending");
+  });
+
+  it("resolves a valid choice", () => {
+    const outcome = elicitChoice(
+      withAnswer("priority", { choice: "high" }),
+      "priority",
+      "Priority?",
+      choices
+    );
+
+    expect(outcome).toEqual({ status: "ready", value: "high" });
+  });
+
+  it("re-asks rather than trusting a value outside the options", () => {
+    // The answer comes from an untrusted client, so it is validated.
+    const outcome = elicitChoice(
+      withAnswer("priority", { choice: "catastrophic" }),
+      "priority",
+      "Priority?",
+      choices
+    );
+
+    expect(outcome.status).toBe("pending");
+  });
+
+  it("offers the options in the schema", () => {
+    const outcome = elicitChoice(firstRound, "priority", "Priority?", choices);
+
+    if (outcome.status !== "pending") throw new Error("expected pending");
+    const request = outcome.result.inputRequests?.priority as {
+      params: { requestedSchema: { properties: { choice: { enum: string[] } } } };
+    };
+    expect(request.params.requestedSchema.properties.choice.enum).toEqual(["low", "high"]);
+  });
+});
+
+describe("elicitInput", () => {
+  const schema = {
+    type: "object" as const,
+    properties: { title: { type: "string" as const } },
+    required: ["title"],
+  };
+
+  it("asks on the first round", () => {
+    const outcome = elicitInput(firstRound, "task", "Create a task:", schema);
+
+    expect(outcome.status).toBe("pending");
+  });
+
+  it("returns the whole accepted object", () => {
+    const outcome = elicitInput<{ title: string }>(
+      withAnswer("task", { title: "Ship it" }),
+      "task",
+      "Create a task:",
+      schema
+    );
+
+    expect(outcome).toEqual({ status: "ready", value: { title: "Ship it" } });
+  });
+});
+
+describe("requestInput", () => {
+  it("composes several requests into one round trip", () => {
+    const combined = requestInput({
+      a: textRequest("A?"),
+      b: confirmationRequest("B?"),
     });
 
-    it("should return options timeout when provided", () => {
-      process.env.MCP_ELICITATION_TIMEOUT_MS = "60000";
-      expect(getElicitationTimeout(30000)).toBe(30000);
+    expect(Object.keys(combined.inputRequests ?? {})).toEqual(["a", "b"]);
+  });
+
+  it("carries requestState when supplied", () => {
+    const outcome = elicitText(firstRound, "name", "Your name?", { requestState: "step-2" });
+
+    if (outcome.status !== "pending") throw new Error("expected pending");
+    expect(outcome.result.requestState).toBe("step-2");
+  });
+
+  it("omits requestState when not supplied", () => {
+    const outcome = elicitText(firstRound, "name", "Your name?");
+
+    if (outcome.status !== "pending") throw new Error("expected pending");
+    expect(outcome.result.requestState).toBeUndefined();
+  });
+});
+
+describe("readResponse", () => {
+  it("is undefined on the first round", () => {
+    expect(readResponse(firstRound, "anything")).toBeUndefined();
+  });
+
+  it("returns accepted content", () => {
+    expect(readResponse(withAnswer("k", { a: 1 }), "k")).toEqual({ a: 1 });
+  });
+
+  it("is undefined for a different key", () => {
+    expect(readResponse(withAnswer("k", { a: 1 }), "other")).toBeUndefined();
+  });
+});
+
+describe("canElicit", () => {
+  it("is true when the client declared the capability", () => {
+    expect(canElicit({ clientCapabilities: { elicitation: {} } })).toBe(true);
+  });
+
+  it("is false when it did not", () => {
+    expect(canElicit({ clientCapabilities: {} })).toBe(false);
+  });
+
+  // Legacy HTTP carries no capabilities, which is also why it cannot elicit.
+  it("is false when no capabilities are available at all", () => {
+    expect(canElicit({})).toBe(false);
+  });
+});
+
+describe("errors", () => {
+  it("ElicitationNotSupportedError carries a default message", () => {
+    const error = new ElicitationNotSupportedError();
+
+    expect(error.name).toBe("ElicitationNotSupportedError");
+    expect(error.message).toContain("not available");
+  });
+
+  it("ElicitationDeclinedError carries a default message", () => {
+    const error = new ElicitationDeclinedError();
+
+    expect(error.name).toBe("ElicitationDeclinedError");
+    expect(error.message).toContain("declined");
+  });
+});
+
+describe("elicitAll", () => {
+  it("asks for everything outstanding in one round", () => {
+    const outcome = elicitAll(firstRound, {
+      name: textRequest("Your name?"),
+      team: textRequest("Your team?"),
     });
 
-    it("should return env timeout when no options", () => {
-      process.env.MCP_ELICITATION_TIMEOUT_MS = "60000";
-      expect(getElicitationTimeout()).toBe(60000);
+    expect(outcome.status).toBe("pending");
+    if (outcome.status !== "pending") return;
+    expect(Object.keys(outcome.result.inputRequests ?? {})).toEqual(["name", "team"]);
+  });
+
+  it("only re-asks what is still missing", () => {
+    const outcome = elicitAll(withAnswer("name", { value: "Ada" }), {
+      name: textRequest("Your name?"),
+      team: textRequest("Your team?"),
     });
 
-    it("should return default when no env or options", () => {
-      process.env.MCP_ELICITATION_TIMEOUT_MS = undefined;
-      expect(getElicitationTimeout()).toBe(DEFAULT_ELICITATION_TIMEOUT_MS);
+    if (outcome.status !== "pending") throw new Error("expected pending");
+    expect(Object.keys(outcome.result.inputRequests ?? {})).toEqual(["team"]);
+  });
+
+  it("returns every answer once all have arrived", () => {
+    const context = {
+      inputResponses: {
+        name: { kind: "elicit", action: "accept", content: { value: "Ada" } },
+        team: { kind: "elicit", action: "accept", content: { value: "platform" } },
+      },
+    } as unknown as Pick<ServerContext, "inputResponses">;
+
+    const outcome = elicitAll(context, {
+      name: textRequest("Your name?"),
+      team: textRequest("Your team?"),
     });
 
-    it("should ignore invalid env values", () => {
-      process.env.MCP_ELICITATION_TIMEOUT_MS = "invalid";
-      expect(getElicitationTimeout()).toBe(DEFAULT_ELICITATION_TIMEOUT_MS);
+    expect(outcome).toEqual({
+      status: "ready",
+      value: { name: { value: "Ada" }, team: { value: "platform" } },
     });
+  });
+});
 
-    it("should ignore negative env values", () => {
-      process.env.MCP_ELICITATION_TIMEOUT_MS = "-1000";
-      expect(getElicitationTimeout()).toBe(DEFAULT_ELICITATION_TIMEOUT_MS);
+describe("request builders", () => {
+  it("textRequest asks for a string", () => {
+    const request = textRequest("Your name?", "Full name") as {
+      params: { message: string; requestedSchema: { properties: Record<string, unknown> } };
+    };
+
+    expect(request.params.message).toBe("Your name?");
+    expect(request.params.requestedSchema.properties.value).toMatchObject({
+      type: "string",
+      description: "Full name",
     });
   });
 
-  describe("clientSupportsElicitation", () => {
-    it("should return false when no capabilities", () => {
-      const server = {} as unknown as Server;
-      expect(clientSupportsElicitation(server)).toBe(false);
-    });
+  it("confirmationRequest asks for a boolean", () => {
+    const request = confirmationRequest("Sure?") as {
+      params: { requestedSchema: { properties: Record<string, { type: string }> } };
+    };
 
-    it("should return false when elicitation not in capabilities", () => {
-      const server = {
-        _clientCapabilities: {},
-      } as unknown as Server;
-      expect(clientSupportsElicitation(server)).toBe(false);
-    });
-
-    it("should return false when form not in elicitation", () => {
-      const server = {
-        _clientCapabilities: { elicitation: {} },
-      } as unknown as Server;
-      expect(clientSupportsElicitation(server)).toBe(false);
-    });
-
-    it("should return true when form elicitation supported", () => {
-      const server = {
-        _clientCapabilities: { elicitation: { form: true } },
-      } as unknown as Server;
-      expect(clientSupportsElicitation(server)).toBe(true);
-    });
+    expect(request.params.requestedSchema.properties.confirm.type).toBe("boolean");
   });
 
-  describe("elicitInput", () => {
-    let mockServer: MockServer;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+  it("choiceRequest offers the given values", () => {
+    const request = choiceRequest("Pick", [{ value: "a" }, { value: "b", label: "Bee" }]) as {
+      params: { requestedSchema: { properties: { choice: { enum: string[] } } } };
+    };
 
-    beforeEach(() => {
-      consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockServer = {
-        _clientCapabilities: { elicitation: { form: true } },
-        elicitInput: vi.fn(),
-      };
-    });
+    expect(request.params.requestedSchema.properties.choice.enum).toEqual(["a", "b"]);
+  });
+});
 
-    afterEach(() => {
-      consoleSpy.mockRestore();
-    });
+describe("carryForward", () => {
+  // Answers arrive one round at a time and do not accumulate, so a sequential
+  // flow has to carry earlier ones itself or it re-asks forever.
+  it("merges carried answers with the ones that just arrived", () => {
+    const carried = carryForward({
+      carriedState: { answers: { a: { kind: "elicit", action: "accept", content: { v: 1 } } } },
+      inputResponses: { b: { kind: "elicit", action: "accept", content: { v: 2 } } },
+    } as unknown as Pick<ServerContext, "inputResponses" | "carriedState" | "mintRequestState">);
 
-    it("should throw when client does not support elicitation", async () => {
-      const unsupportedServer = {} as unknown as Server;
-
-      await expect(
-        elicitInput(unsupportedServer, "Test", { type: "object", properties: {} })
-      ).rejects.toThrow(ElicitationNotSupportedError);
-    });
-
-    it("should return typed result on accept", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { name: "John", age: 30 },
-      });
-
-      const result = await elicitInput<{ name: string; age: number }>(mockServer, "Enter details", {
-        type: "object",
-        properties: {
-          name: { type: "string", title: "Name" },
-          age: { type: "integer", title: "Age" },
-        },
-      });
-
-      expect(result.action).toBe("accept");
-      expect(result.content).toEqual({ name: "John", age: 30 });
-    });
-
-    it("should return decline action", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "decline",
-      });
-
-      const result = await elicitInput(mockServer, "Test", { type: "object", properties: {} });
-
-      expect(result.action).toBe("decline");
-      expect(result.content).toBeUndefined();
-    });
-
-    it("should return cancel action", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "cancel",
-      });
-
-      const result = await elicitInput(mockServer, "Test", { type: "object", properties: {} });
-
-      expect(result.action).toBe("cancel");
-    });
-
-    it("should pass timeout to server", async () => {
-      mockServer.elicitInput.mockResolvedValue({ action: "cancel" });
-
-      await elicitInput(mockServer, "Test", { type: "object", properties: {} }, { timeout: 10000 });
-
-      expect(mockServer.elicitInput).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({ timeout: 10000 })
-      );
-    });
-
-    it("should not log when logEvent is false", async () => {
-      mockServer.elicitInput.mockResolvedValue({ action: "cancel" });
-
-      await elicitInput(
-        mockServer,
-        "Test",
-        { type: "object", properties: {} },
-        { logEvent: false }
-      );
-
-      // Should not have logged (no calls to console.error for debug messages)
-      // This is a bit indirect since we mock console.error
-      expect(mockServer.elicitInput).toHaveBeenCalled();
-    });
+    expect(readResponse(carried.context, "a")).toEqual({ v: 1 });
+    expect(readResponse(carried.context, "b")).toEqual({ v: 2 });
   });
 
-  describe("elicitConfirmation", () => {
-    let mockServer: MockServer;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+  it("lets a newly arrived answer supersede a carried one", () => {
+    const carried = carryForward({
+      carriedState: { answers: { a: { kind: "elicit", action: "accept", content: { v: 1 } } } },
+      inputResponses: { a: { kind: "elicit", action: "accept", content: { v: 99 } } },
+    } as unknown as Pick<ServerContext, "inputResponses" | "carriedState" | "mintRequestState">);
 
-    beforeEach(() => {
-      consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockServer = {
-        _clientCapabilities: { elicitation: { form: true } },
-        elicitInput: vi.fn(),
-      };
-    });
-
-    afterEach(() => {
-      consoleSpy.mockRestore();
-    });
-
-    it("should return confirmed true when user confirms", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { confirm: true },
-      });
-
-      const result = await elicitConfirmation(mockServer, "Confirm action?");
-
-      expect(result.confirmed).toBe(true);
-    });
-
-    it("should return confirmed false when user declines", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { confirm: false },
-      });
-
-      const result = await elicitConfirmation(mockServer, "Confirm action?");
-
-      expect(result.confirmed).toBe(false);
-    });
-
-    it("should return reason when provided", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { confirm: false, reason: "Not ready" },
-      });
-
-      const result = await elicitConfirmation(mockServer, "Confirm action?");
-
-      expect(result.confirmed).toBe(false);
-      expect(result.reason).toBe("Not ready");
-    });
-
-    it("should return not confirmed on cancel", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "cancel",
-      });
-
-      const result = await elicitConfirmation(mockServer, "Confirm action?");
-
-      expect(result.confirmed).toBe(false);
-    });
+    expect(readResponse(carried.context, "a")).toEqual({ v: 99 });
   });
 
-  describe("elicitText", () => {
-    let mockServer: MockServer;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+  it("signs the accumulated answers into the next round's state", async () => {
+    const minted: Record<string, unknown>[] = [];
+    const carried = carryForward({
+      inputResponses: { a: { kind: "elicit", action: "accept", content: { v: 1 } } },
+      mintRequestState: async (payload) => {
+        minted.push(payload);
+        return "signed-state";
+      },
+    } as unknown as Pick<ServerContext, "inputResponses" | "carriedState" | "mintRequestState">);
 
-    beforeEach(() => {
-      consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockServer = {
-        _clientCapabilities: { elicitation: { form: true } },
-        elicitInput: vi.fn(),
-      };
-    });
+    const pending = elicitText(carried.context, "b", "B?");
+    if (pending.status !== "pending") throw new Error("expected pending");
+    const result = await carried.remember(pending.result);
 
-    afterEach(() => {
-      consoleSpy.mockRestore();
-    });
-
-    it("should return text value on accept", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { value: "Hello World" },
-      });
-
-      const result = await elicitText(mockServer, "Enter text:");
-
-      expect(result).toBe("Hello World");
-    });
-
-    it("should return undefined on cancel", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "cancel",
-      });
-
-      const result = await elicitText(mockServer, "Enter text:");
-
-      expect(result).toBeUndefined();
-    });
-
-    it("should pass field config", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { value: "Test" },
-      });
-
-      await elicitText(mockServer, "Enter:", {
-        title: "Custom Title",
-        description: "Custom description",
-        minLength: 1,
-        maxLength: 100,
-        default: "Default",
-      });
-
-      expect(mockServer.elicitInput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requestedSchema: expect.objectContaining({
-            properties: expect.objectContaining({
-              value: expect.objectContaining({
-                title: "Custom Title",
-                description: "Custom description",
-                minLength: 1,
-                maxLength: 100,
-                default: "Default",
-              }),
-            }),
-          }),
-        }),
-        expect.any(Object)
-      );
-    });
+    expect(result.requestState).toBe("signed-state");
+    expect(minted[0]).toHaveProperty("answers");
   });
 
-  describe("elicitChoice", () => {
-    let mockServer: MockServer;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+  it("refuses to carry state when no signing key is configured", async () => {
+    const carried = carryForward({ inputResponses: {} } as Pick<
+      ServerContext,
+      "inputResponses" | "carriedState" | "mintRequestState"
+    >);
 
-    beforeEach(() => {
-      consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockServer = {
-        _clientCapabilities: { elicitation: { form: true } },
-        elicitInput: vi.fn(),
-      };
-    });
+    const pending = elicitText(carried.context, "a", "A?");
+    if (pending.status !== "pending") throw new Error("expected pending");
 
-    afterEach(() => {
-      consoleSpy.mockRestore();
-    });
-
-    it("should return selected choice on accept", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { choice: "medium" },
-      });
-
-      const result = await elicitChoice(mockServer, "Select priority:", [
-        { value: "low", label: "Low" },
-        { value: "medium", label: "Medium" },
-        { value: "high", label: "High" },
-      ]);
-
-      expect(result).toBe("medium");
-    });
-
-    it("should return undefined on decline", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "decline",
-      });
-
-      const result = await elicitChoice(mockServer, "Select:", [
-        { value: "a", label: "A" },
-        { value: "b", label: "B" },
-      ]);
-
-      expect(result).toBeUndefined();
-    });
-
-    it("should pass enum values and labels", async () => {
-      mockServer.elicitInput.mockResolvedValue({
-        action: "accept",
-        content: { choice: "opt1" },
-      });
-
-      await elicitChoice(mockServer, "Choose:", [
-        { value: "opt1", label: "Option 1" },
-        { value: "opt2", label: "Option 2" },
-      ]);
-
-      expect(mockServer.elicitInput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requestedSchema: expect.objectContaining({
-            properties: expect.objectContaining({
-              choice: expect.objectContaining({
-                enum: ["opt1", "opt2"],
-                enumNames: ["Option 1", "Option 2"],
-              }),
-            }),
-          }),
-        }),
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe("Error classes", () => {
-    it("ElicitationDeclinedError should have correct name", () => {
-      const error = new ElicitationDeclinedError("User declined");
-      expect(error.name).toBe("ElicitationDeclinedError");
-      expect(error.message).toBe("User declined");
-      expect(error).toBeInstanceOf(Error);
-    });
-
-    it("ElicitationValidationError should have correct name", () => {
-      const error = new ElicitationValidationError("Invalid input");
-      expect(error.name).toBe("ElicitationValidationError");
-      expect(error.message).toBe("Invalid input");
-      expect(error).toBeInstanceOf(Error);
-    });
+    await expect(carried.remember(pending.result)).rejects.toThrow(ElicitationNotSupportedError);
   });
 });

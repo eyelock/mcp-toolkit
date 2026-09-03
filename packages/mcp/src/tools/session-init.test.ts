@@ -25,6 +25,7 @@ describe("Session Tools", () => {
   beforeEach(() => {
     context = {
       provider: createMemoryProvider(),
+      sessionId: "test-session",
       identity: defaultIdentity,
       name: "test-toolkit",
       version: "0.0.0",
@@ -56,7 +57,7 @@ describe("Session Tools", () => {
     });
 
     it("returns error if session already exists", async () => {
-      await context.provider.initSession({ projectName: "existing" });
+      await context.provider.initSession({ projectName: "existing" }, context.sessionId);
 
       const result = await handleSessionInit({ projectName: "new-project" }, context);
 
@@ -122,6 +123,7 @@ describe("Session Tools", () => {
     it("shows tags when set", async () => {
       const taggedContext: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: { canonicalName: "test-toolkit", tags: { env: "development", team: "platform" } },
         name: "test-toolkit",
         version: "0.0.0",
@@ -151,7 +153,7 @@ describe("Session Tools", () => {
     });
 
     it("updates session successfully", async () => {
-      await context.provider.initSession({ projectName: "old-name" });
+      await context.provider.initSession({ projectName: "old-name" }, context.sessionId);
 
       const result = await handleSessionUpdate({ projectName: "new-name" }, context);
 
@@ -160,7 +162,7 @@ describe("Session Tools", () => {
     });
 
     it("returns error if update fails", async () => {
-      await context.provider.initSession({ projectName: "test" });
+      await context.provider.initSession({ projectName: "test" }, context.sessionId);
 
       const result = await handleSessionUpdate({ projectName: "Invalid Name" }, context);
 
@@ -178,13 +180,13 @@ describe("Session Tools", () => {
 
   describe("handleSessionClear", () => {
     it("clears the session", async () => {
-      await context.provider.initSession({ projectName: "test" });
+      await context.provider.initSession({ projectName: "test" }, context.sessionId);
 
       const result = await handleSessionClear({}, context);
 
       expect(result.isError).toBeUndefined();
       expect((result.content[0] as { text: string }).text).toContain("cleared");
-      expect(await context.provider.hasSession()).toBe(false);
+      expect(await context.provider.hasSession(context.sessionId)).toBe(false);
     });
   });
 
@@ -204,7 +206,7 @@ describe("Session Tools", () => {
     });
 
     it("returns session status when session exists", async () => {
-      await context.provider.initSession({ projectName: "test-project" });
+      await context.provider.initSession({ projectName: "test-project" }, context.sessionId);
 
       const result = await handleSessionStatus({}, context);
 
@@ -213,10 +215,13 @@ describe("Session Tools", () => {
     });
 
     it("shows 'none' when session has no enabled features", async () => {
-      await context.provider.initSession({
-        projectName: "test-project",
-        features: { tools: false, resources: false, prompts: false, sampling: false },
-      });
+      await context.provider.initSession(
+        {
+          projectName: "test-project",
+          features: { tools: false, resources: false, prompts: false, sampling: false },
+        },
+        context.sessionId
+      );
 
       const result = await handleSessionStatus({}, context);
 
@@ -224,7 +229,7 @@ describe("Session Tools", () => {
     });
 
     it("shows (none) when no tags are set", async () => {
-      await context.provider.initSession({ projectName: "test-project" });
+      await context.provider.initSession({ projectName: "test-project" }, context.sessionId);
 
       const result = await handleSessionStatus({}, context);
 
@@ -234,11 +239,15 @@ describe("Session Tools", () => {
     it("shows tags when set", async () => {
       const taggedContext: ServerContext = {
         provider: createMemoryProvider(),
+        sessionId: "test-session",
         identity: { canonicalName: "test-toolkit", tags: { env: "staging", owner: "david" } },
         name: "test-toolkit",
         version: "0.0.0",
       };
-      await taggedContext.provider.initSession({ projectName: "test-project" });
+      await taggedContext.provider.initSession(
+        { projectName: "test-project" },
+        taggedContext.sessionId
+      );
 
       const result = await handleSessionStatus({}, taggedContext);
 

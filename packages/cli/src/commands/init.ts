@@ -5,9 +5,9 @@
  * Demonstrates CLI/MCP parity pattern.
  */
 
-import { createMemoryProvider } from "@mcp-toolkit/core";
 import { SessionFeaturesSchema } from "@mcp-toolkit/model";
 import { Args, Command, Flags } from "@oclif/core";
+import { CLI_SESSION_ID, createCliProvider } from "../provider.js";
 
 export default class Init extends Command {
   static override description = "Initialize a new session with project configuration";
@@ -73,14 +73,17 @@ export default class Init extends Command {
     // Validate features
     const validatedFeatures = SessionFeaturesSchema.parse(features);
 
-    // Use provider (in real implementation, this would persist)
-    // CLI doesn't use sampling, so disable client discovery
-    const provider = createMemoryProvider();
-    const result = await provider.initSession({
-      projectName: args.projectName,
-      features: validatedFeatures,
-      discoverClient: false,
-    });
+    // Persisted to disk under the CLI's well-known handle, so `status` can
+    // read back what this command wrote. Re-running init replaces the session.
+    const provider = createCliProvider();
+    await provider.clearSession(CLI_SESSION_ID);
+    const result = await provider.initSession(
+      {
+        projectName: args.projectName,
+        features: validatedFeatures,
+      },
+      CLI_SESSION_ID
+    );
 
     if (!result.success) {
       this.error(`Failed to initialize session: ${result.error}`);

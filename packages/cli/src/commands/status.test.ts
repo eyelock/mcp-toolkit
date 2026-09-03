@@ -1,13 +1,15 @@
-import * as providerModule from "@mcp-toolkit/core";
+import { MemoryProvider } from "@mcp-toolkit/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as providerModule from "../provider.js";
 import Status from "./status.js";
 
-// Mock the provider module
-vi.mock("@mcp-toolkit/core", async (importOriginal) => {
+// Swap the CLI's file-backed provider for an in-memory one: these tests are
+// about command output, and should not touch the real session directory.
+vi.mock("../provider.js", async (importOriginal) => {
   const original = await importOriginal<typeof providerModule>();
   return {
     ...original,
-    createMemoryProvider: vi.fn(() => original.createMemoryProvider()),
+    createCliProvider: vi.fn(() => new MemoryProvider()),
   };
 });
 
@@ -17,9 +19,7 @@ describe("Status command", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // Reset to real implementation by default
-    vi.mocked(providerModule.createMemoryProvider).mockImplementation(
-      () => new providerModule.MemoryProvider()
-    );
+    vi.mocked(providerModule.createCliProvider).mockImplementation(() => new MemoryProvider());
     logSpy = vi.spyOn(Status.prototype, "log").mockImplementation(() => {});
   });
 
@@ -47,13 +47,14 @@ describe("Status command", () => {
   describe("when session exists", () => {
     beforeEach(() => {
       const mockSession = {
+        sessionId: "cli",
         projectName: "test-project",
         features: { tools: true, resources: true, prompts: false, sampling: false },
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
       };
 
-      vi.mocked(providerModule.createMemoryProvider).mockReturnValue({
+      vi.mocked(providerModule.createCliProvider).mockReturnValue({
         name: "memory",
         hasSession: vi.fn().mockResolvedValue(true),
         getSession: vi.fn().mockResolvedValue({ success: true, data: mockSession }),
@@ -79,12 +80,13 @@ describe("Status command", () => {
     });
 
     it("shows 'none' when all features are disabled", async () => {
-      vi.mocked(providerModule.createMemoryProvider).mockReturnValue({
+      vi.mocked(providerModule.createCliProvider).mockReturnValue({
         name: "memory",
         hasSession: vi.fn().mockResolvedValue(true),
         getSession: vi.fn().mockResolvedValue({
           success: true,
           data: {
+            sessionId: "cli",
             projectName: "test-project",
             features: { tools: false, resources: false, prompts: false, sampling: false },
             createdAt: "2024-01-01T00:00:00.000Z",

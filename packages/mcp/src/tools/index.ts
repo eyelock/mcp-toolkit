@@ -5,7 +5,7 @@
  */
 
 import { getToolkitComponents, getToolkitHandlers } from "@mcp-toolkit/toolkit";
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server.js";
 import { handleServerInfo, serverInfoTool } from "./server-info.js";
 import {

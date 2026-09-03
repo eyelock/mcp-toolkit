@@ -4,7 +4,7 @@
  * Provides guidance for domain model design.
  */
 
-import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult, Prompt } from "@modelcontextprotocol/server";
 
 /**
  * Prompt for starting the design process

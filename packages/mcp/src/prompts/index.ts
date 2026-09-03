@@ -5,7 +5,7 @@
  */
 
 import { getToolkitComponents, getToolkitHandlers } from "@mcp-toolkit/toolkit";
-import type { GetPromptResult, Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult, Prompt } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server.js";
 import {
   getSessionSetupPrompt,

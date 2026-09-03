@@ -5,7 +5,7 @@
  * between different installations of the same canonical server.
  */
 
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server.js";
 
 /**

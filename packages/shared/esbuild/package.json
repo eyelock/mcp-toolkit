@@ -8,6 +8,6 @@
     ".": "./index.js"
   },
   "dependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.2"
   }
 }

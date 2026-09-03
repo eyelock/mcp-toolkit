@@ -106,7 +106,7 @@ describe("handleToolkitPrompt", () => {
 
     expect(result).not.toBeNull();
     // Should not have the context suffix
-    const textContent = (result?.messages[0].content as { text: string }).text;
+    const textContent = (result!.messages[0].content as { text: string }).text;
     expect(textContent).not.toContain("Context:");
   });
 

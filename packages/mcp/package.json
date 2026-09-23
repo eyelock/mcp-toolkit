@@ -41,13 +41,13 @@
     "@mcp-toolkit/model": "workspace:*",
     "@mcp-toolkit/toolkit": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "zod": "^4.5.4",
+    "zod": "^4.6.5",
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.2",
     "@vitest/coverage-v8": "^4.1.11",
     "typescript": "^6.0.2",
     "vitest": "^4.1.11"

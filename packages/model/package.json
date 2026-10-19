@@ -27,13 +27,13 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "zod": "^4.6.5",
+    "zod": "^4.6.7",
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@mcp-toolkit/typescript-config": "workspace:*",
     "@mcp-toolkit/vitest-config": "workspace:*",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^4.1.11",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"

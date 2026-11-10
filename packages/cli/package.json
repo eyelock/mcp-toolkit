@@ -25,7 +25,7 @@
     "@mcp-toolkit/core": "workspace:*",
     "@mcp-toolkit/model": "workspace:*",
     "@oclif/core": "^4.14.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@mcp-toolkit/typescript-config": "workspace:*",
